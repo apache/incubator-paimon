@@ -52,6 +52,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.paimon.CoreOptions.EncryptionMechanism.PLAINTEXT;
 import static org.apache.paimon.options.ConfigOptions.key;
 import static org.apache.paimon.options.description.TextElement.text;
 import static org.apache.paimon.utils.Preconditions.checkArgument;
@@ -1084,6 +1085,40 @@ public class CoreOptions implements Serializable {
                             "Whether to enable deletion vectors mode. In this mode, index files containing deletion"
                                     + " vectors are generated when data is written, which marks the data for deletion."
                                     + " During read operations, by applying these index files, merging can be avoided.");
+    public static final ConfigOption<EncryptionMechanism> ENCRYPTION_MECHANISM =
+            key("encryption.mechanism")
+                    .enumType(EncryptionMechanism.class)
+                    .defaultValue(PLAINTEXT)
+                    .withDescription(
+                            "Encryption mechanism for paimon, the default value is plaintext, which means it is not encrypted.");
+
+    public static final ConfigOption<EncryptionKmsClient> ENCRYPTION_KMS_CLIENT =
+            key("encryption.kms-client")
+                    .enumType(EncryptionKmsClient.class)
+                    .noDefaultValue()
+                    .withDescription(
+                            "The kms client for encryption, if the user has enabled encryption, the kms client must be specified.");
+
+    public static final ConfigOption<String> HADOOP_SECURITY =
+            key("hadoop.security.#")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "If user use the hadoop KMS, parameters prefixed with `hadoop.security.` can be added, the `hadoop.security.key.provider.path` is required. For more information, please see https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/core-default.xml.");
+
+    public static final ConfigOption<String> ENCRYPTION_COLUMNS =
+            key("encryption.columns")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specify the partial columns to be encrypted, separated by commas. If this parameter is not specified, all columns will be encrypted.");
+
+    public static final ConfigOption<String> ENCRYPTION_ALGORITHM =
+            key("encryption.algorithm")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Encryption algorithm for encrypting data files, for parquet format, the value can be `AES_GCM_V1` or `AES_GCM_CTR_V1`, and the default value is `AES_GCM_CTR_V1`. And can not specify algorithm for orc format now.");
 
     private final Options options;
 
@@ -1656,6 +1691,22 @@ public class CoreOptions implements Serializable {
 
     public boolean deletionVectorsEnabled() {
         return options.get(DELETION_VECTORS_ENABLED);
+    }
+
+    public EncryptionMechanism encryptionMechanism() {
+        return options.get(ENCRYPTION_MECHANISM);
+    }
+
+    public EncryptionKmsClient encryptionKmsClient() {
+        return options.get(ENCRYPTION_KMS_CLIENT);
+    }
+
+    public String encryptionAlgorithm() {
+        return options.get(ENCRYPTION_ALGORITHM);
+    }
+
+    public String encryptionColumns() {
+        return options.get(ENCRYPTION_COLUMNS);
     }
 
     /** Specifies the merge engine for table with primary key. */
@@ -2258,6 +2309,54 @@ public class CoreOptions implements Serializable {
         private final String description;
 
         ConsumerMode(String value, String description) {
+            this.value = value;
+            this.description = description;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+
+        @Override
+        public InlineElement getDescription() {
+            return text(description);
+        }
+    }
+
+    /** The kms client for encryption. */
+    public enum EncryptionKmsClient implements DescribedEnum {
+        MEMORY("memory", "Use memory kms for encryption, this is only for test."),
+        HADOOP("hadoop", "Use hadoop kms for encryption.");
+
+        private final String value;
+        private final String description;
+
+        EncryptionKmsClient(String value, String description) {
+            this.value = value;
+            this.description = description;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+
+        @Override
+        public InlineElement getDescription() {
+            return text(description);
+        }
+    }
+
+    /** The encryption mechanism for paimon. */
+    public enum EncryptionMechanism implements DescribedEnum {
+        PLAINTEXT("plaintext", "Do not encrypt the data files."),
+        ENVELOPE("envelope", "Encrypt data file using envelope encryption mechanism.");
+
+        private final String value;
+        private final String description;
+
+        EncryptionMechanism(String value, String description) {
             this.value = value;
             this.description = description;
         }
