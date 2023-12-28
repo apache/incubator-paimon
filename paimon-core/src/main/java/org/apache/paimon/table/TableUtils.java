@@ -55,7 +55,7 @@ public class TableUtils {
     }
 
     /**
-     * Delete according to filters.
+     * Delete table partition.
      *
      * <p>NOTE: This method is only suitable for deletion of small amount of data.
      *
