@@ -33,6 +33,7 @@ import org.apache.paimon.types.RowKind;
 import org.apache.paimon.utils.CloseableIterator;
 
 import java.util.List;
+import java.util.Map;
 
 /** Utils for Table. TODO we can introduce LocalAction maybe? */
 public class TableUtils {
@@ -47,8 +48,30 @@ public class TableUtils {
      * @return the number of deleted records
      */
     public static long deleteWhere(Table table, List<Predicate> filters) {
-        ReadBuilder readBuilder = table.newReadBuilder().withFilter(filters);
-        BatchWriteBuilder writeBuilder = table.newBatchWriteBuilder();
+        return deleteWithFilter(
+                table.newReadBuilder().withFilter(filters),
+                table.newBatchWriteBuilder(),
+                new PredicateFilter(table.rowType(), filters));
+    }
+
+    /**
+     * Delete according to filters.
+     *
+     * <p>NOTE: This method is only suitable for deletion of small amount of data.
+     *
+     * @return the number of deleted records
+     */
+    public static long deletePartition(Table table, Map<String, String> partitionSpec) {
+        return deleteWithFilter(
+                table.newReadBuilder().withPartitionFilter(partitionSpec),
+                table.newBatchWriteBuilder(),
+                f -> true);
+    }
+
+    private static long deleteWithFilter(
+            ReadBuilder readBuilder,
+            BatchWriteBuilder writeBuilder,
+            java.util.function.Predicate<InternalRow> rowFilter) {
         List<Split> splits = readBuilder.newScan().plan().splits();
         long hit = 0;
         try (RecordReader<InternalRow> reader = readBuilder.newRead().createReader(splits);
@@ -58,10 +81,9 @@ public class TableUtils {
                 BatchTableCommit commit = writeBuilder.newCommit()) {
             write.withIOManager(ioManager);
             CloseableIterator<InternalRow> iterator = reader.toCloseableIterator();
-            PredicateFilter filter = new PredicateFilter(table.rowType(), filters);
             while (iterator.hasNext()) {
                 InternalRow row = iterator.next();
-                if (filter.test(row)) {
+                if (rowFilter.test(row)) {
                     hit++;
                     row.setRowKind(RowKind.DELETE);
                     write.write(row);

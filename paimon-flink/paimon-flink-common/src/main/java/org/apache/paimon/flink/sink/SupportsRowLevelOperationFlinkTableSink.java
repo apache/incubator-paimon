@@ -34,6 +34,8 @@ import org.apache.paimon.table.PrimaryKeyFileStoreTable;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.table.TableUtils;
 import org.apache.paimon.table.sink.BatchWriteBuilder;
+import org.apache.paimon.table.source.Split;
+import org.apache.paimon.table.source.TableScan;
 
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -64,6 +66,8 @@ import static org.apache.paimon.CoreOptions.MERGE_ENGINE;
 /** Flink table sink that supports row level update and delete. */
 public abstract class SupportsRowLevelOperationFlinkTableSink extends FlinkTableSinkBase
         implements SupportsRowLevelUpdate, SupportsRowLevelDelete, SupportsDeletePushDown {
+
+    private static final int singleNodeMaxRecordHandle = 1_000_000;
 
     @Nullable protected Predicate deletePredicate;
 
@@ -163,7 +167,9 @@ public abstract class SupportsRowLevelOperationFlinkTableSink extends FlinkTable
             }
         }
         deletePredicate = predicates.isEmpty() ? null : PredicateBuilder.and(predicates);
-        return canPushDownDeleteFilter();
+        TableScan.Plan plan = table.newReadBuilder().withFilter(deletePredicate).newScan().plan();
+        long rowCount = plan.splits().stream().map(Split::rowCount).count();
+        return rowCount < singleNodeMaxRecordHandle && canPushDownDeleteFilter();
     }
 
     @Override
@@ -175,7 +181,7 @@ public abstract class SupportsRowLevelOperationFlinkTableSink extends FlinkTable
             commit.purgeTable(identifier);
             return Optional.empty();
         } else if (deleteIsDropPartition()) {
-            commit.dropPartitions(Collections.singletonList(deletePartitions()), identifier);
+            Optional.of(TableUtils.deletePartition(table, deletePartitions()));
             return Optional.empty();
         } else {
             return Optional.of(
