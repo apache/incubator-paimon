@@ -181,8 +181,7 @@ public abstract class SupportsRowLevelOperationFlinkTableSink extends FlinkTable
             commit.purgeTable(identifier);
             return Optional.empty();
         } else if (deleteIsDropPartition()) {
-            Optional.of(TableUtils.deletePartition(table, deletePartitions()));
-            return Optional.empty();
+            return Optional.of(TableUtils.deletePartition(table, deletePartitions()));
         } else {
             return Optional.of(
                     TableUtils.deleteWhere(table, Collections.singletonList(deletePredicate)));
