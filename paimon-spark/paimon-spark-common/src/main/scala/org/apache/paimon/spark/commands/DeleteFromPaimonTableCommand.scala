@@ -18,7 +18,6 @@
 package org.apache.paimon.spark.commands
 
 import org.apache.paimon.options.Options
-import org.apache.paimon.predicate.OnlyPartitionKeyEqualVisitor
 import org.apache.paimon.spark.{InsertInto, SparkTable}
 import org.apache.paimon.spark.leafnode.PaimonLeafRunnableCommand
 import org.apache.paimon.spark.schema.SparkSystemColumns.ROW_KIND_COL
@@ -65,15 +64,7 @@ case class DeleteFromPaimonTableCommand(v2Table: SparkTable, delete: DeleteFromT
     } else if (deletePredicate.isEmpty) {
       commit.purgeTable(BatchWriteBuilder.COMMIT_IDENTIFIER)
     } else {
-      val visitor = new OnlyPartitionKeyEqualVisitor(table.partitionKeys)
-      if (deletePredicate.get.visit(visitor)) {
-        val dropPartitions = visitor.partitions()
-        commit.dropPartitions(
-          Collections.singletonList(dropPartitions),
-          BatchWriteBuilder.COMMIT_IDENTIFIER)
-      } else {
-        deleteRowsByCondition(sparkSession)
-      }
+      deleteRowsByCondition(sparkSession)
     }
 
     Seq.empty[Row]
