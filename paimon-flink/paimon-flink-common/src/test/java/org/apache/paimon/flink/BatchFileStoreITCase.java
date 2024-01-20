@@ -26,6 +26,8 @@ import org.apache.paimon.utils.DateTimeUtils;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -402,6 +404,31 @@ public class BatchFileStoreITCase extends CatalogITCaseBase {
         assertThat(iterator.collect(2))
                 .containsExactlyInAnyOrder(
                         Row.ofKind(RowKind.INSERT, 1, "B"), Row.ofKind(RowKind.INSERT, 2, "B"));
+        iterator.close();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"lookup", "input"})
+    public void testDeletePartitionWithChangelog(String producer) throws Exception {
+        sql(
+                "CREATE TABLE ignore_delete (pt INT, pk INT, v STRING, PRIMARY KEY(pt, pk) NOT ENFORCED) PARTITIONED BY (pt)   "
+                        + "WITH ('changelog-producer' = '"
+                        + producer
+                        + "')");
+        BlockingIterator<Row, Row> iterator = streamSqlBlockIter("SELECT * FROM ignore_delete");
+
+        sql("INSERT INTO ignore_delete VALUES (1, 1, 'A'), (2, 2, 'B')");
+        assertThat(iterator.collect(2))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, 1, 1, "A"),
+                        Row.ofKind(RowKind.INSERT, 2, 2, "B"));
+        sql("DELETE FROM ignore_delete WHERE pt = 1");
+        assertThat(iterator.collect(1))
+                .containsExactlyInAnyOrder(Row.ofKind(RowKind.DELETE, 1, 1, "A"));
+        sql("INSERT INTO ignore_delete VALUES (1, 1, 'B')");
+
+        assertThat(iterator.collect(1))
+                .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, 1, 1, "B"));
         iterator.close();
     }
 
