@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.paimon.flink.procedure;
+package org.apache.paimon.flink.procedure.privilege;
 
 import org.apache.flink.table.procedure.ProcedureContext;
 

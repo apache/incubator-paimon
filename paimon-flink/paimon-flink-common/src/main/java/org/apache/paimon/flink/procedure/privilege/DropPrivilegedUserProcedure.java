@@ -16,27 +16,25 @@
  * limitations under the License.
  */
 
-package org.apache.paimon.flink.procedure;
+package org.apache.paimon.flink.procedure.privilege;
 
 import org.apache.flink.table.procedure.ProcedureContext;
 
 /**
- * Procedure to initialize privilege system in warehouse. This procedure will automatically create a
- * root user with the provided password. Usage:
+ * Procedure to drop a user from the privilege system. Only users with {@link
+ * org.apache.paimon.privilege.PrivilegeType#ADMIN} privilege can perform this operation. Usage:
  *
  * <pre><code>
- *  CALL sys.init_privilege('rootPassword')
+ *  CALL sys.drop_privileged_user('username')
  * </code></pre>
  */
-public class InitPrivilegeProcedure extends PrivilegeProcedureBase {
+public class DropPrivilegedUserProcedure extends PrivilegeProcedureBase {
 
-    public static final String IDENTIFIER = "init_privilege";
+    public static final String IDENTIFIER = "drop_privileged_user";
 
-    public String[] call(ProcedureContext procedureContext, String rootPassword) {
-        getPrivilegedCatalog().initializePrivilege(rootPassword);
-        return new String[] {
-            "Privilege system is successfully enabled. Please drop and re-create the catalog."
-        };
+    public String[] call(ProcedureContext procedureContext, String name) {
+        getPrivilegedCatalog().dropPrivilegedUser(name);
+        return new String[] {String.format("User %s is dropped.", name)};
     }
 
     @Override

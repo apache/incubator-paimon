@@ -16,29 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.paimon.flink.procedure;
+package org.apache.paimon.flink.procedure.privilege;
 
-import org.apache.flink.table.procedure.ProcedureContext;
+import org.apache.paimon.flink.procedure.ProcedureBase;
+import org.apache.paimon.privilege.PrivilegedCatalog;
 
-/**
- * Procedure to drop a user from the privilege system. Only users with {@link
- * org.apache.paimon.privilege.PrivilegeType#ADMIN} privilege can perform this operation. Usage:
- *
- * <pre><code>
- *  CALL sys.drop_privileged_user('username')
- * </code></pre>
- */
-public class DropPrivilegedUserProcedure extends PrivilegeProcedureBase {
+/** Base class for privilege-related procedures. */
+public abstract class PrivilegeProcedureBase extends ProcedureBase {
 
-    public static final String IDENTIFIER = "drop_privileged_user";
-
-    public String[] call(ProcedureContext procedureContext, String name) {
-        getPrivilegedCatalog().dropPrivilegedUser(name);
-        return new String[] {String.format("User %s is dropped.", name)};
-    }
-
-    @Override
-    public String identifier() {
-        return IDENTIFIER;
+    protected PrivilegedCatalog getPrivilegedCatalog() {
+        if (catalog instanceof PrivilegedCatalog) {
+            return (PrivilegedCatalog) catalog;
+        } else {
+            throw new UnsupportedOperationException(
+                    "The catalog you specified does not support privilege system");
+        }
     }
 }
