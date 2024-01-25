@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.paimon.flink.procedure;
+package org.apache.paimon.flink.procedure.privilege;
 
 import org.apache.paimon.flink.util.AbstractTestBase;
 import org.apache.paimon.privilege.NoPrivilegeException;
