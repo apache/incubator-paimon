@@ -111,11 +111,15 @@ CALL sys.init_privilege('root-password');
 
 {{< /tabs >}}
 
+After the privilege system is enabled, you will not be able to access any table through the old catalog
+because you'll now be authenticated as the `anonymous` user.
+Please re-create the catalog and authenticate as `root` to create other users and grant them privileges.
+
 ## Accessing Privileged Catalogs
 
 To access a privileged catalog and to be authenticated as a user,
 you need to define `user` and `password` catalog options when creating the catalog.
-For example, the following SQL creates a catalog while trying to be authenticated as `test-user`,
+For example, the following SQL creates a catalog while trying to be authenticated as `root`,
 whose password is `mypassword`.
 
 {{< tabs "access-catalog" >}}
@@ -125,7 +129,7 @@ whose password is `mypassword`.
 CREATE CATALOG `my-catalog` WITH (
     'type' = 'paimon',
     -- ...
-    'user' = 'test-user',
+    'user' = 'root',
     'password' = 'mypassword'
 );
 ```
@@ -135,7 +139,7 @@ CREATE CATALOG `my-catalog` WITH (
 
 ## Creating Users
 
-You must be authenticated as a user with `ADMIN` privilege to perform this operation.
+You must be authenticated as a user with `ADMIN` privilege (for example, `root`) to perform this operation.
 
 Do the following steps to create a user in the privilege system.
 
@@ -158,7 +162,7 @@ CALL sys.create_privileged_user('user', 'password');
 
 ## Dropping Users
 
-You must be authenticated as a user with `ADMIN` privilege to perform this operation.
+You must be authenticated as a user with `ADMIN` privilege (for example, `root`) to perform this operation.
 
 Do the following steps to drop a user in the privilege system.
 
@@ -180,7 +184,7 @@ CALL sys.drop_privileged_user('user');
 
 ## Granting Privileges to Users
 
-You must be authenticated as a user with `ADMIN` privilege to perform this operation.
+You must be authenticated as a user with `ADMIN` privilege (for example, `root`) to perform this operation.
 
 Do the following steps to grant a user with privilege in the privilege system.
 
@@ -207,7 +211,7 @@ CALL sys.grant_privilege_to_user('user', 'SELECT', 'my_db', 'my_tbl');
 
 ## Revoking Privileges to Users
 
-You must be authenticated as a user with `ADMIN` privilege to perform this operation.
+You must be authenticated as a user with `ADMIN` privilege (for example, `root`) to perform this operation.
 
 Do the following steps to revoke a privilege from user in the privilege system.
 
