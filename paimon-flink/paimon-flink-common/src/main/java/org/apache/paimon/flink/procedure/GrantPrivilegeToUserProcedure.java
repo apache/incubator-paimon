@@ -20,7 +20,6 @@ package org.apache.paimon.flink.procedure;
 
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.privilege.PrivilegeType;
-import org.apache.paimon.privilege.PrivilegedCatalog;
 
 import org.apache.flink.table.procedure.ProcedureContext;
 
@@ -35,13 +34,12 @@ import org.apache.flink.table.procedure.ProcedureContext;
  *  CALL sys.grant_privilege_to_user('username', 'privilege', 'database', 'table')
  * </code></pre>
  */
-public class GrantPrivilegeToUserProcedure extends ProcedureBase {
+public class GrantPrivilegeToUserProcedure extends PrivilegeProcedureBase {
 
     public static final String IDENTIFIER = "grant_privilege_to_user";
 
     public String[] call(ProcedureContext procedureContext, String user, String privilege) {
-        ((PrivilegedCatalog) catalog)
-                .grantPrivilegeOnCatalog(user, PrivilegeType.valueOf(privilege));
+        getPrivilegedCatalog().grantPrivilegeOnCatalog(user, PrivilegeType.valueOf(privilege));
         return new String[] {
             String.format("User %s is granted with privilege %s on the catalog.", user, privilege)
         };
@@ -49,7 +47,7 @@ public class GrantPrivilegeToUserProcedure extends ProcedureBase {
 
     public String[] call(
             ProcedureContext procedureContext, String user, String privilege, String database) {
-        ((PrivilegedCatalog) catalog)
+        getPrivilegedCatalog()
                 .grantPrivilegeOnDatabase(user, database, PrivilegeType.valueOf(privilege));
         return new String[] {
             String.format(
@@ -65,7 +63,7 @@ public class GrantPrivilegeToUserProcedure extends ProcedureBase {
             String database,
             String table) {
         Identifier identifier = Identifier.create(database, table);
-        ((PrivilegedCatalog) catalog)
+        getPrivilegedCatalog()
                 .grantPrivilegeOnTable(user, identifier, PrivilegeType.valueOf(privilege));
         return new String[] {
             String.format(

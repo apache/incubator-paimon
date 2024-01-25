@@ -20,7 +20,6 @@ package org.apache.paimon.flink.procedure;
 
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.privilege.PrivilegeType;
-import org.apache.paimon.privilege.PrivilegedCatalog;
 
 import org.apache.flink.table.procedure.ProcedureContext;
 
@@ -35,13 +34,13 @@ import org.apache.flink.table.procedure.ProcedureContext;
  *  CALL sys.revoke_privilege_from_user('username', 'privilege', 'database', 'table')
  * </code></pre>
  */
-public class RevokePrivilegeFromUserProcedure extends ProcedureBase {
+public class RevokePrivilegeFromUserProcedure extends PrivilegeProcedureBase {
 
     public static final String IDENTIFIER = "revoke_privilege_from_user";
 
     public String[] call(ProcedureContext procedureContext, String user, String privilege) {
         int count =
-                ((PrivilegedCatalog) catalog)
+                getPrivilegedCatalog()
                         .revokePrivilegeOnCatalog(user, PrivilegeType.valueOf(privilege));
         return new String[] {
             String.format("User %s is revoked with privilege %s on the catalog.", user, privilege),
@@ -52,7 +51,7 @@ public class RevokePrivilegeFromUserProcedure extends ProcedureBase {
     public String[] call(
             ProcedureContext procedureContext, String user, String privilege, String database) {
         int count =
-                ((PrivilegedCatalog) catalog)
+                getPrivilegedCatalog()
                         .revokePrivilegeOnDatabase(
                                 user, database, PrivilegeType.valueOf(privilege));
         return new String[] {
@@ -71,7 +70,7 @@ public class RevokePrivilegeFromUserProcedure extends ProcedureBase {
             String table) {
         Identifier identifier = Identifier.create(database, table);
         int count =
-                ((PrivilegedCatalog) catalog)
+                getPrivilegedCatalog()
                         .revokePrivilegeOnTable(user, identifier, PrivilegeType.valueOf(privilege));
         return new String[] {
             String.format(

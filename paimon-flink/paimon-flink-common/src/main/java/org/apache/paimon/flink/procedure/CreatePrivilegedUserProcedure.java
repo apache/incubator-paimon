@@ -18,8 +18,6 @@
 
 package org.apache.paimon.flink.procedure;
 
-import org.apache.paimon.privilege.PrivilegedCatalog;
-
 import org.apache.flink.table.procedure.ProcedureContext;
 
 /**
@@ -30,12 +28,12 @@ import org.apache.flink.table.procedure.ProcedureContext;
  *  CALL sys.create_privileged_user('username', 'password')
  * </code></pre>
  */
-public class CreatePrivilegedUserProcedure extends ProcedureBase {
+public class CreatePrivilegedUserProcedure extends PrivilegeProcedureBase {
 
     public static final String IDENTIFIER = "create_privileged_user";
 
     public String[] call(ProcedureContext procedureContext, String name, String password) {
-        ((PrivilegedCatalog) catalog).createPrivilegedUser(name, password);
+        getPrivilegedCatalog().createPrivilegedUser(name, password);
         return new String[] {String.format("User %s is created without any privileges.", name)};
     }
 

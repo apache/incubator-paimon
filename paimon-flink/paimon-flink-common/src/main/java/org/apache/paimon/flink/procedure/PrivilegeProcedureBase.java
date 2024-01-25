@@ -18,29 +18,17 @@
 
 package org.apache.paimon.flink.procedure;
 
-import org.apache.flink.table.procedure.ProcedureContext;
+import org.apache.paimon.privilege.PrivilegedCatalog;
 
-/**
- * Procedure to initialize privilege system in warehouse. This procedure will automatically create a
- * root user with the provided password. Usage:
- *
- * <pre><code>
- *  CALL sys.init_privilege('rootPassword')
- * </code></pre>
- */
-public class InitPrivilegeProcedure extends PrivilegeProcedureBase {
+/** Base class for privilege-related procedures. */
+public abstract class PrivilegeProcedureBase extends ProcedureBase {
 
-    public static final String IDENTIFIER = "init_privilege";
-
-    public String[] call(ProcedureContext procedureContext, String rootPassword) {
-        getPrivilegedCatalog().initializePrivilege(rootPassword);
-        return new String[] {
-            "Privilege system is successfully enabled. Please drop and re-create the catalog."
-        };
-    }
-
-    @Override
-    public String identifier() {
-        return IDENTIFIER;
+    protected PrivilegedCatalog getPrivilegedCatalog() {
+        if (catalog instanceof PrivilegedCatalog) {
+            return (PrivilegedCatalog) catalog;
+        } else {
+            throw new UnsupportedOperationException(
+                    "The catalog you specified does not support privilege system");
+        }
     }
 }

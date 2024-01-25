@@ -18,8 +18,6 @@
 
 package org.apache.paimon.flink.procedure;
 
-import org.apache.paimon.privilege.PrivilegedCatalog;
-
 import org.apache.flink.table.procedure.ProcedureContext;
 
 /**
@@ -30,12 +28,12 @@ import org.apache.flink.table.procedure.ProcedureContext;
  *  CALL sys.drop_privileged_user('username')
  * </code></pre>
  */
-public class DropPrivilegedUserProcedure extends ProcedureBase {
+public class DropPrivilegedUserProcedure extends PrivilegeProcedureBase {
 
     public static final String IDENTIFIER = "drop_privileged_user";
 
     public String[] call(ProcedureContext procedureContext, String name) {
-        ((PrivilegedCatalog) catalog).dropPrivilegedUser(name);
+        getPrivilegedCatalog().dropPrivilegedUser(name);
         return new String[] {String.format("User %s is dropped.", name)};
     }
 
