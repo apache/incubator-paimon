@@ -42,6 +42,7 @@ import org.apache.paimon.utils.SnapshotManager;
 import org.apache.paimon.utils.TagManager;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /** {@link FileStoreTable} with privilege checks. */
@@ -241,5 +242,19 @@ public class PrivilegedFileStoreTable implements FileStoreTable {
     @Override
     public boolean supportStreamingReadOverwrite() {
         return wrapped.supportStreamingReadOverwrite();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PrivilegedFileStoreTable that = (PrivilegedFileStoreTable) o;
+        return Objects.equals(wrapped, that.wrapped)
+                && Objects.equals(privilegeChecker, that.privilegeChecker)
+                && Objects.equals(identifier, that.identifier);
     }
 }

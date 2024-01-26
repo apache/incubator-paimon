@@ -55,4 +55,12 @@ public class AllGrantedPrivilegeChecker implements PrivilegeChecker {
 
     @Override
     public void assertCanRevoke() {}
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        return o != null && getClass() == o.getClass();
+    }
 }

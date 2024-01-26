@@ -21,6 +21,7 @@ package org.apache.paimon.privilege;
 import org.apache.paimon.catalog.Identifier;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /** Implementation of {@link PrivilegeChecker}. */
@@ -135,5 +136,17 @@ public class PrivilegeCheckerImpl implements PrivilegeChecker {
             return check(
                     identifier.substring(0, Math.max(identifier.lastIndexOf('.'), 0)), privilege);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PrivilegeCheckerImpl that = (PrivilegeCheckerImpl) o;
+        return Objects.equals(user, that.user) && Objects.equals(privileges, that.privileges);
     }
 }
