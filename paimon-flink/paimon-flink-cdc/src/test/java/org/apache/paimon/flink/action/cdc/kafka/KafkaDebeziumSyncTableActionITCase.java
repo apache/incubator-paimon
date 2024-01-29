@@ -103,4 +103,16 @@ public class KafkaDebeziumSyncTableActionITCase extends KafkaSyncTableActionITCa
     public void testAllTypesWithSchema() throws Exception {
         testAllTypesWithSchemaImpl(DEBEZIUM);
     }
+
+    @Test
+    @Timeout(120)
+    public void testRecordAndAutoDiscoveryPrimaryKeys() throws Exception {
+        testRecordWithPrimaryKeys(DEBEZIUM);
+    }
+
+    @Test
+    @Timeout(120)
+    public void testSchemaIncludeRecordAndAutoDiscoveryPrimaryKeys() throws Exception {
+        testSchemaIncludeRecordWithPrimaryKeys(DEBEZIUM);
+    }
 }
