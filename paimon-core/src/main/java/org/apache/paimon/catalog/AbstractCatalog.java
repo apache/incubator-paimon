@@ -26,7 +26,13 @@ import org.apache.paimon.fs.Path;
 import org.apache.paimon.lineage.LineageMetaFactory;
 import org.apache.paimon.operation.FileStoreCommit;
 import org.apache.paimon.operation.Lock;
+import org.apache.paimon.options.ConfigOption;
+import org.apache.paimon.options.ConfigOptions;
 import org.apache.paimon.options.Options;
+import org.apache.paimon.privilege.PrivilegeManager;
+import org.apache.paimon.privilege.PrivilegeType;
+import org.apache.paimon.privilege.PrivilegedCatalog;
+import org.apache.paimon.privilege.PrivilegedFileStoreTable;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.schema.TableSchema;
@@ -36,6 +42,7 @@ import org.apache.paimon.table.FileStoreTableFactory;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.table.sink.BatchWriteBuilder;
 import org.apache.paimon.table.system.SystemTableLoader;
+import org.apache.paimon.utils.Preconditions;
 import org.apache.paimon.utils.StringUtils;
 
 import javax.annotation.Nullable;
@@ -54,11 +61,18 @@ import static org.apache.paimon.options.OptionsUtils.convertToPropertiesPrefixKe
 import static org.apache.paimon.utils.Preconditions.checkArgument;
 
 /** Common implementation of {@link Catalog}. */
-public abstract class AbstractCatalog implements Catalog {
+public abstract class AbstractCatalog implements Catalog, PrivilegedCatalog {
 
     public static final String DB_SUFFIX = ".db";
     protected static final String TABLE_DEFAULT_OPTION_PREFIX = "table-default.";
     protected static final String DB_LOCATION_PROP = "location";
+
+    private static final ConfigOption<String> USER =
+            ConfigOptions.key("user").stringType().defaultValue(PrivilegeManager.USER_ANONYMOUS);
+    private static final ConfigOption<String> PASSWORD =
+            ConfigOptions.key("password")
+                    .stringType()
+                    .defaultValue(PrivilegeManager.PASSWORD_ANONYMOUS);
 
     protected final FileIO fileIO;
     protected final Map<String, String> tableDefaultOptions;
@@ -66,20 +80,24 @@ public abstract class AbstractCatalog implements Catalog {
 
     @Nullable protected final LineageMetaFactory lineageMetaFactory;
 
+    private PrivilegeManager privilegeManager;
+
     protected AbstractCatalog(FileIO fileIO) {
         this.fileIO = fileIO;
-        this.lineageMetaFactory = null;
         this.tableDefaultOptions = new HashMap<>();
         this.catalogOptions = new Options();
+
+        this.lineageMetaFactory = null;
     }
 
     protected AbstractCatalog(FileIO fileIO, Options options) {
         this.fileIO = fileIO;
-        this.lineageMetaFactory =
-                findAndCreateLineageMeta(options, AbstractCatalog.class.getClassLoader());
         this.tableDefaultOptions =
                 convertToPropertiesPrefixKey(options.toMap(), TABLE_DEFAULT_OPTION_PREFIX);
         this.catalogOptions = options;
+
+        this.lineageMetaFactory =
+                findAndCreateLineageMeta(options, AbstractCatalog.class.getClassLoader());
     }
 
     @Override
@@ -96,6 +114,7 @@ public abstract class AbstractCatalog implements Catalog {
     @Override
     public void createDatabase(String name, boolean ignoreIfExists, Map<String, String> properties)
             throws DatabaseAlreadyExistException {
+        getPrivilegeManager().getPrivilegeChecker().assertCanCreateDatabase();
         if (isSystemDatabase(name)) {
             throw new ProcessSystemDatabaseException();
         }
@@ -107,6 +126,8 @@ public abstract class AbstractCatalog implements Catalog {
         }
         createDatabaseImpl(name, properties);
     }
+
+    protected abstract void createDatabaseImpl(String name, Map<String, String> properties);
 
     @Override
     public Map<String, String> loadDatabaseProperties(String name)
@@ -125,6 +146,7 @@ public abstract class AbstractCatalog implements Catalog {
     @Override
     public void dropPartition(Identifier identifier, Map<String, String> partitionSpec)
             throws TableNotExistException {
+        getPrivilegeManager().getPrivilegeChecker().assertCanInsert(identifier);
         Table table = getTable(identifier);
         FileStoreTable fileStoreTable = (FileStoreTable) table;
         FileStoreCommit commit = fileStoreTable.store().newCommit(UUID.randomUUID().toString());
@@ -132,11 +154,10 @@ public abstract class AbstractCatalog implements Catalog {
                 Collections.singletonList(partitionSpec), BatchWriteBuilder.COMMIT_IDENTIFIER);
     }
 
-    protected abstract void createDatabaseImpl(String name, Map<String, String> properties);
-
     @Override
     public void dropDatabase(String name, boolean ignoreIfNotExists, boolean cascade)
             throws DatabaseNotExistException, DatabaseNotEmptyException {
+        getPrivilegeManager().getPrivilegeChecker().assertCanDropDatabase(name);
         if (isSystemDatabase(name)) {
             throw new ProcessSystemDatabaseException();
         }
@@ -152,6 +173,7 @@ public abstract class AbstractCatalog implements Catalog {
         }
 
         dropDatabaseImpl(name);
+        getPrivilegeManager().objectDropped(name);
     }
 
     protected abstract void dropDatabaseImpl(String name);
@@ -173,6 +195,7 @@ public abstract class AbstractCatalog implements Catalog {
     @Override
     public void dropTable(Identifier identifier, boolean ignoreIfNotExists)
             throws TableNotExistException {
+        getPrivilegeManager().getPrivilegeChecker().assertCanDropTable(identifier);
         checkNotSystemTable(identifier, "dropTable");
         if (!tableExists(identifier)) {
             if (ignoreIfNotExists) {
@@ -182,6 +205,7 @@ public abstract class AbstractCatalog implements Catalog {
         }
 
         dropTableImpl(identifier);
+        getPrivilegeManager().objectDropped(identifier.getFullName());
     }
 
     protected abstract void dropTableImpl(Identifier identifier);
@@ -189,6 +213,9 @@ public abstract class AbstractCatalog implements Catalog {
     @Override
     public void createTable(Identifier identifier, Schema schema, boolean ignoreIfExists)
             throws TableAlreadyExistException, DatabaseNotExistException {
+        getPrivilegeManager()
+                .getPrivilegeChecker()
+                .assertCanCreateTable(identifier.getDatabaseName());
         checkNotSystemTable(identifier, "createTable");
         validateIdentifierNameCaseInsensitive(identifier);
         validateFieldNameCaseInsensitive(schema.rowType().getFieldNames());
@@ -215,6 +242,7 @@ public abstract class AbstractCatalog implements Catalog {
     @Override
     public void renameTable(Identifier fromTable, Identifier toTable, boolean ignoreIfNotExists)
             throws TableNotExistException, TableAlreadyExistException {
+        getPrivilegeManager().getPrivilegeChecker().assertCanAlterTable(fromTable);
         checkNotSystemTable(fromTable, "renameTable");
         checkNotSystemTable(toTable, "renameTable");
         validateIdentifierNameCaseInsensitive(toTable);
@@ -231,6 +259,7 @@ public abstract class AbstractCatalog implements Catalog {
         }
 
         renameTableImpl(fromTable, toTable);
+        getPrivilegeManager().objectRenamed(fromTable.getFullName(), toTable.getFullName());
     }
 
     protected abstract void renameTableImpl(Identifier fromTable, Identifier toTable);
@@ -239,6 +268,7 @@ public abstract class AbstractCatalog implements Catalog {
     public void alterTable(
             Identifier identifier, List<SchemaChange> changes, boolean ignoreIfNotExists)
             throws TableNotExistException, ColumnAlreadyExistException, ColumnNotExistException {
+        getPrivilegeManager().getPrivilegeChecker().assertCanAlterTable(identifier);
         checkNotSystemTable(identifier, "alterTable");
         validateIdentifierNameCaseInsensitive(identifier);
         validateFieldNameCaseInsensitiveInSchemaChange(changes);
@@ -299,14 +329,17 @@ public abstract class AbstractCatalog implements Catalog {
 
     private FileStoreTable getDataTable(Identifier identifier) throws TableNotExistException {
         TableSchema tableSchema = getDataTableSchema(identifier);
-        return FileStoreTableFactory.create(
-                fileIO,
-                getDataTableLocation(identifier),
-                tableSchema,
-                new CatalogEnvironment(
-                        Lock.factory(lockFactory().orElse(null), identifier),
-                        metastoreClientFactory(identifier).orElse(null),
-                        lineageMetaFactory));
+        FileStoreTable table =
+                FileStoreTableFactory.create(
+                        fileIO,
+                        getDataTableLocation(identifier),
+                        tableSchema,
+                        new CatalogEnvironment(
+                                Lock.factory(lockFactory().orElse(null), identifier),
+                                metastoreClientFactory(identifier).orElse(null),
+                                lineageMetaFactory));
+        return new PrivilegedFileStoreTable(
+                table, getPrivilegeManager().getPrivilegeChecker(), identifier);
     }
 
     /**
@@ -463,5 +496,78 @@ public abstract class AbstractCatalog implements Catalog {
                 String.format(
                         "The value of %s property should be %s.",
                         CoreOptions.AUTO_CREATE.key(), Boolean.FALSE));
+    }
+
+    @Override
+    public void initializePrivilege(String rootPassword) {
+        getPrivilegeManager().initializePrivilege(rootPassword);
+    }
+
+    @Override
+    public void createPrivilegedUser(String user, String password) {
+        getPrivilegeManager().createUser(user, password);
+    }
+
+    @Override
+    public void dropPrivilegedUser(String user) {
+        getPrivilegeManager().dropUser(user);
+    }
+
+    @Override
+    public void grantPrivilegeOnCatalog(String user, PrivilegeType privilege) {
+        Preconditions.checkArgument(
+                privilege.canGrantOnCatalog(),
+                "Privilege " + privilege + " can't be granted on a catalog");
+        getPrivilegeManager().grant(user, PrivilegeManager.IDENTIFIER_WHOLE_CATALOG, privilege);
+    }
+
+    @Override
+    public void grantPrivilegeOnDatabase(
+            String user, String databaseName, PrivilegeType privilege) {
+        Preconditions.checkArgument(
+                privilege.canGrantOnDatabase(),
+                "Privilege " + privilege + " can't be granted on a database");
+        Preconditions.checkArgument(
+                databaseExists(databaseName), "Database " + databaseName + " does not exist");
+        getPrivilegeManager().grant(user, databaseName, privilege);
+    }
+
+    @Override
+    public void grantPrivilegeOnTable(String user, Identifier identifier, PrivilegeType privilege) {
+        Preconditions.checkArgument(
+                privilege.canGrantOnTable(),
+                "Privilege " + privilege + " can't be granted on a table");
+        Preconditions.checkArgument(
+                tableExists(identifier), "Table " + identifier + " does not exist");
+        getPrivilegeManager().grant(user, identifier.getFullName(), privilege);
+    }
+
+    @Override
+    public int revokePrivilegeOnCatalog(String user, PrivilegeType privilege) {
+        return getPrivilegeManager()
+                .revoke(user, PrivilegeManager.IDENTIFIER_WHOLE_CATALOG, privilege);
+    }
+
+    @Override
+    public int revokePrivilegeOnDatabase(
+            String user, String databaseName, PrivilegeType privilege) {
+        return getPrivilegeManager().revoke(user, databaseName, privilege);
+    }
+
+    @Override
+    public int revokePrivilegeOnTable(String user, Identifier identifier, PrivilegeType privilege) {
+        return getPrivilegeManager().revoke(user, identifier.getFullName(), privilege);
+    }
+
+    private PrivilegeManager getPrivilegeManager() {
+        if (privilegeManager == null) {
+            privilegeManager =
+                    new PrivilegeManager(
+                            warehouse(),
+                            fileIO(),
+                            catalogOptions.get(USER),
+                            catalogOptions.get(PASSWORD));
+        }
+        return privilegeManager;
     }
 }
