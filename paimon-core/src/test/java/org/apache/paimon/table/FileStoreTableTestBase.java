@@ -949,15 +949,14 @@ public abstract class FileStoreTableTestBase {
         // verify test-tag in test-branch is equal to snapshot 2
         Snapshot branchTag =
                 Snapshot.fromPath(
-                        new TraceableFileIO(), tagManager.branchTagPath("test-branch", "test-tag"));
+                        new TraceableFileIO(), tagManager.tagPath("test-branch", "test-tag"));
         assertThat(branchTag.equals(snapshot2)).isTrue();
 
         // verify snapshot in test-branch is equal to snapshot 2
         SnapshotManager snapshotManager = new SnapshotManager(new TraceableFileIO(), tablePath);
         Snapshot branchSnapshot =
                 Snapshot.fromPath(
-                        new TraceableFileIO(),
-                        snapshotManager.branchSnapshotPath("test-branch", 2));
+                        new TraceableFileIO(), snapshotManager.snapshotPath("test-branch", 2));
         assertThat(branchSnapshot.equals(snapshot2)).isTrue();
 
         // verify schema in test-branch is equal to schema 0

@@ -75,32 +75,23 @@ public class SnapshotManager implements Serializable {
     }
 
     public Path snapshotDirectory() {
-        return new Path(tablePath + "/snapshot");
+        return snapshotDirectory(DEFAULT_MAIN_BRANCH);
+    }
+
+    public Path snapshotDirectory(String branchName) {
+        return new Path(getBranchPath(fileIO, tablePath, branchName) + "/snapshot");
     }
 
     public Path snapshotPath(long snapshotId) {
-        return new Path(tablePath + "/snapshot/" + SNAPSHOT_PREFIX + snapshotId);
+        return snapshotPath(DEFAULT_MAIN_BRANCH, snapshotId);
     }
 
-    public Path branchSnapshotDirectory(String branchName) {
-        return new Path(getBranchPath(tablePath, branchName) + "/snapshot");
-    }
-
-    public Path branchSnapshotPath(String branchName, long snapshotId) {
+    public Path snapshotPath(String branchName, long snapshotId) {
         return new Path(
-                getBranchPath(tablePath, branchName) + "/snapshot/" + SNAPSHOT_PREFIX + snapshotId);
-    }
-
-    public Path snapshotPathByBranch(String branchName, long snapshotId) {
-        return branchName.equals(DEFAULT_MAIN_BRANCH)
-                ? snapshotPath(snapshotId)
-                : branchSnapshotPath(branchName, snapshotId);
-    }
-
-    public Path snapshotDirByBranch(String branchName) {
-        return branchName.equals(DEFAULT_MAIN_BRANCH)
-                ? snapshotDirectory()
-                : branchSnapshotDirectory(branchName);
+                getBranchPath(fileIO, tablePath, branchName)
+                        + "/snapshot/"
+                        + SNAPSHOT_PREFIX
+                        + snapshotId);
     }
 
     public Snapshot snapshot(long snapshotId) {
@@ -108,8 +99,19 @@ public class SnapshotManager implements Serializable {
     }
 
     public Snapshot snapshot(String branchName, long snapshotId) {
-        Path snapshotPath = snapshotPathByBranch(branchName, snapshotId);
+        Path snapshotPath = snapshotPath(branchName, snapshotId);
         return Snapshot.fromPath(fileIO, snapshotPath);
+    }
+
+    public boolean snapshotExists(String branchName, long snapshotId) {
+        Path path = snapshotPath(branchName, snapshotId);
+        try {
+            return fileIO.exists(path);
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    "Failed to determine if snapshot #" + snapshotId + " exists in path " + path,
+                    e);
+        }
     }
 
     public boolean snapshotExists(long snapshotId) {
@@ -394,7 +396,7 @@ public class SnapshotManager implements Serializable {
     }
 
     private @Nullable Long findLatest(String branchName) throws IOException {
-        Path snapshotDir = snapshotDirByBranch(branchName);
+        Path snapshotDir = snapshotDirectory(branchName);
         if (!fileIO.exists(snapshotDir)) {
             return null;
         }
@@ -412,7 +414,7 @@ public class SnapshotManager implements Serializable {
     }
 
     private @Nullable Long findEarliest(String branchName) throws IOException {
-        Path snapshotDir = snapshotDirByBranch(branchName);
+        Path snapshotDir = snapshotDirectory(branchName);
         if (!fileIO.exists(snapshotDir)) {
             return null;
         }
@@ -431,7 +433,7 @@ public class SnapshotManager implements Serializable {
     }
 
     public Long readHint(String fileName, String branchName) {
-        Path snapshotDir = snapshotDirByBranch(branchName);
+        Path snapshotDir = snapshotDirectory(branchName);
         Path path = new Path(snapshotDir, fileName);
         int retryNumber = 0;
         while (retryNumber++ < READ_HINT_RETRY_NUM) {
@@ -451,7 +453,7 @@ public class SnapshotManager implements Serializable {
 
     private Long findByListFiles(BinaryOperator<Long> reducer, String branchName)
             throws IOException {
-        Path snapshotDir = snapshotDirByBranch(branchName);
+        Path snapshotDir = snapshotDirectory(branchName);
         return listVersionedFiles(fileIO, snapshotDir, SNAPSHOT_PREFIX)
                 .reduce(reducer)
                 .orElse(null);
@@ -475,7 +477,7 @@ public class SnapshotManager implements Serializable {
 
     private void commitHint(long snapshotId, String fileName, String branchName)
             throws IOException {
-        Path snapshotDir = snapshotDirByBranch(branchName);
+        Path snapshotDir = snapshotDirectory(branchName);
         Path hintFile = new Path(snapshotDir, fileName);
         fileIO.overwriteFileUtf8(hintFile, String.valueOf(snapshotId));
     }
