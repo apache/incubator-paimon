@@ -32,7 +32,6 @@ import org.apache.paimon.utils.ExecutorThreadFactory;
 import org.apache.paimon.shade.guava30.com.google.common.collect.Lists;
 
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,7 +118,6 @@ public class UnawareCombinedCompactionWorkerOperator
                 .processElement(element);
     }
 
-    @NotNull
     private UnwareBucketCompactionHelper unwareBucketCompactionHelper(Identifier tableId) {
         try {
             return new UnwareBucketCompactionHelper(

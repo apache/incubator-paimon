@@ -43,7 +43,7 @@ public class AppendOnlyCompactionTask {
     private final Identifier tableIdentifier;
 
     public AppendOnlyCompactionTask(BinaryRow partition, List<DataFileMeta> files) {
-        this(partition, files, null);
+        this(partition, files, Identifier.EMPTY);
     }
 
     public AppendOnlyCompactionTask(

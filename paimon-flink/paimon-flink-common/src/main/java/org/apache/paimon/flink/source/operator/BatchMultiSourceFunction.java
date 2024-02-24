@@ -41,7 +41,8 @@ import org.apache.flink.table.data.RowData;
 import java.util.regex.Pattern;
 
 /** It is responsible for monitoring compactor source of multi bucket table in batch mode. */
-public class BatchMultiSourceFunction extends CombineModeCompactorSourceFunction<Tuple2<Split, String>> {
+public class BatchMultiSourceFunction
+        extends CombineModeCompactorSourceFunction<Tuple2<Split, String>> {
 
     public BatchMultiSourceFunction(
             Catalog.Loader catalogLoader,

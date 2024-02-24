@@ -40,9 +40,7 @@ import org.apache.flink.table.data.RowData;
 
 import java.util.regex.Pattern;
 
-/**
- * It is responsible for monitoring compactor source of multi bucket table in stream mode.
- */
+/** It is responsible for monitoring compactor source of multi bucket table in stream mode. */
 public class StreamingMultiSourceFunction
         extends CombineModeCompactorSourceFunction<Tuple2<Split, String>> {
 
@@ -100,12 +98,12 @@ public class StreamingMultiSourceFunction
                 new TupleTypeInfo<>(
                         new JavaTypeInfo<>(Split.class), BasicTypeInfo.STRING_TYPE_INFO);
         return new DataStreamSource<>(
-                env,
-                tupleTypeInfo,
-                sourceOperator,
-                isParallel,
-                name,
-                Boundedness.CONTINUOUS_UNBOUNDED)
+                        env,
+                        tupleTypeInfo,
+                        sourceOperator,
+                        isParallel,
+                        name,
+                        Boundedness.CONTINUOUS_UNBOUNDED)
                 .forceNonParallel()
                 .partitionCustom(
                         (key, numPartitions) -> key % numPartitions,

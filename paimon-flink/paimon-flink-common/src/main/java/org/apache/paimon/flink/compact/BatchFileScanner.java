@@ -36,7 +36,9 @@ public class BatchFileScanner<T> extends CompactionFileScanner<T> {
     public void scan(SourceFunction.SourceContext<T> ctx) throws Exception {
         if (isRunning.get()) {
             Boolean isEmpty = tableScanLogic.collectFiles(ctx);
-            if (isEmpty == null) return;
+            if (isEmpty == null) {
+                return;
+            }
             if (isEmpty) {
                 throw new Exception(
                         "No file were collected. Please ensure there are tables detected after pattern matching");

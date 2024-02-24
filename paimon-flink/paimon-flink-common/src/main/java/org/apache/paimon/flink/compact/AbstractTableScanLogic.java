@@ -37,8 +37,8 @@ import java.util.regex.Pattern;
 import static org.apache.paimon.flink.utils.MultiTablesCompactorUtil.shouldCompactTable;
 
 /**
- * This class is responsible for implementing the scanning logic of different buckets
- * during table compaction.
+ * This class is responsible for implementing the scanning logic of different buckets during table
+ * compaction.
  *
  * @param <T> the result of scanning file :
  *     <ol>
@@ -117,13 +117,9 @@ public abstract class AbstractTableScanLogic<T> {
     abstract Boolean collectFiles(SourceFunction.SourceContext<T> ctx)
             throws Catalog.TableNotExistException, Catalog.DatabaseNotExistException;
 
-    /**
-     * Check if table has been scanned.
-     */
+    /** Check if table has been scanned. */
     abstract boolean tableScanned(Identifier identifier);
 
-    /**
-     * Add the scan table to the table map.
-     */
+    /** Add the scan table to the table map. */
     abstract void addScanTable(FileStoreTable fileStoreTable, Identifier identifier);
 }

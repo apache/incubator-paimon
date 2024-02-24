@@ -43,7 +43,9 @@ public class StreamingFileScanner<T> extends CompactionFileScanner<T> {
     public void scan(SourceFunction.SourceContext<T> ctx) throws Exception {
         while (isRunning.get()) {
             Boolean isEmpty = tableScanLogic.collectFiles(ctx);
-            if (isEmpty == null) return;
+            if (isEmpty == null) {
+                return;
+            }
             if (isEmpty) {
                 Thread.sleep(monitorInterval);
             }

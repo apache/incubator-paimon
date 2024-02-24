@@ -38,7 +38,8 @@ import org.apache.flink.streaming.runtime.partitioner.RebalancePartitioner;
 import java.util.regex.Pattern;
 
 /**
- * It is responsible for the batch compactor source of the table with unaware bucket in combined mode.
+ * It is responsible for the batch compactor source of the table with unaware bucket in combined
+ * mode.
  */
 public class BatchUnawareSourceFunction
         extends CombineModeCompactorSourceFunction<AppendOnlyCompactionTask> {
