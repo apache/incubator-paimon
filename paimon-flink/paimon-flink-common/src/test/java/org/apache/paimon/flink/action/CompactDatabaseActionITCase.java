@@ -25,7 +25,6 @@ import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.flink.FlinkConnectorOptions;
 import org.apache.paimon.schema.Schema;
-import org.apache.paimon.shade.guava30.com.google.common.collect.Lists;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.sink.StreamTableCommit;
 import org.apache.paimon.table.sink.StreamTableWrite;
@@ -38,6 +37,8 @@ import org.apache.paimon.types.DataTypes;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.CommonTestUtils;
 import org.apache.paimon.utils.SnapshotManager;
+
+import org.apache.paimon.shade.guava30.com.google.common.collect.Lists;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class CompactDatabaseActionITCase extends CompactActionITCaseBase {
 
     private static final String[] DATABASE_NAMES = new String[] {"db1", "db2"};
-    private static final String[] TABLE_NAMES = new String[] {"t1","t2","t3_unaware_bucket","t4_unaware_bucket"};
+    private static final String[] TABLE_NAMES =
+            new String[] {"t1", "t2", "t3_unaware_bucket", "t4_unaware_bucket"};
     private static final String[] New_DATABASE_NAMES = new String[] {"db3", "db4"};
     private static final String[] New_TABLE_NAMES = new String[] {"t3", "t4"};
     private static final RowType ROW_TYPE =
@@ -100,23 +102,18 @@ public class CompactDatabaseActionITCase extends CompactActionITCaseBase {
                 Map<String, String> option = new HashMap<>();
                 option.put(CoreOptions.WRITE_ONLY.key(), "true");
                 List<String> keys;
-                if (tableName.endsWith("unaware_bucket")){
+                if (tableName.endsWith("unaware_bucket")) {
                     option.put("bucket", "-1");
                     option.put(CoreOptions.COMPACTION_MIN_FILE_NUM.key(), "2");
                     option.put(CoreOptions.COMPACTION_MAX_FILE_NUM.key(), "2");
                     keys = Lists.newArrayList();
                 } else {
                     option.put("bucket", "1");
-                    keys =Arrays.asList("dt", "hh", "k");
+                    keys = Arrays.asList("dt", "hh", "k");
                 }
 
                 FileStoreTable table =
-                        createTable(
-                                dbName,
-                                tableName,
-                                Arrays.asList("dt", "hh"),
-                                keys,
-                                option);
+                        createTable(dbName, tableName, Arrays.asList("dt", "hh"), keys, option);
 
                 tables.add(table);
                 SnapshotManager snapshotManager = table.snapshotManager();
