@@ -48,8 +48,8 @@ import static org.apache.paimon.flink.utils.MultiTablesCompactorUtil.shouldCompa
  *           bucket ,such as unaware bucket table.
  *     </ol>
  */
-public abstract class AbstractTableScanLogic<T> {
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractTableScanLogic.class);
+public abstract class AbstractBucketScanLogic<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractBucketScanLogic.class);
     protected final Catalog.Loader catalogLoader;
     protected final Pattern includingPattern;
     protected final Pattern excludingPattern;
@@ -60,7 +60,7 @@ public abstract class AbstractTableScanLogic<T> {
     protected AtomicBoolean isRunning;
     protected boolean isStreaming;
 
-    public AbstractTableScanLogic(
+    public AbstractBucketScanLogic(
             Catalog.Loader catalogLoader,
             Pattern includingPattern,
             Pattern excludingPattern,
@@ -98,15 +98,6 @@ public abstract class AbstractTableScanLogic<T> {
                         }
 
                         FileStoreTable fileStoreTable = (FileStoreTable) table;
-                        if (fileStoreTable.bucketMode() == BucketMode.UNAWARE) {
-                            LOG.info(
-                                    String.format(
-                                                    "the bucket mode of %s is unware. ",
-                                                    identifier.getFullName())
-                                            + "currently, the table with unware bucket mode is not support in combined mode.");
-                            continue;
-                        }
-
                         addScanTable(fileStoreTable, identifier);
                     }
                 }
@@ -122,4 +113,6 @@ public abstract class AbstractTableScanLogic<T> {
 
     /** Add the scan table to the table map. */
     abstract void addScanTable(FileStoreTable fileStoreTable, Identifier identifier);
+
+    abstract String bucketType();
 }

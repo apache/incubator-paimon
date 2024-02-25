@@ -43,15 +43,15 @@ import java.util.stream.Collectors;
 import static org.apache.paimon.flink.utils.MultiTablesCompactorUtil.compactOptions;
 
 /**
- * This class is responsible for implementing the scanning logic {@link AbstractTableScanLogic} for
+ * This class is responsible for implementing the scanning logic {@link AbstractBucketScanLogic} for
  * the table with multi bucket such as dynamic or fixed bucket table.
  */
-public class MultiBucketTableScanLogic extends AbstractTableScanLogic<Tuple2<Split, String>> {
-    private static final Logger LOG = LoggerFactory.getLogger(MultiBucketTableScanLogic.class);
+public class MultiBucketScanLogic extends AbstractBucketScanLogic<Tuple2<Split, String>> {
+    private static final Logger LOG = LoggerFactory.getLogger(MultiBucketScanLogic.class);
     protected transient Map<Identifier, BucketsTable> tablesMap;
     protected transient Map<Identifier, StreamTableScan> scansMap;
 
-    public MultiBucketTableScanLogic(
+    public MultiBucketScanLogic(
             Catalog.Loader catalogLoader,
             Pattern includingPattern,
             Pattern excludingPattern,
@@ -121,5 +121,10 @@ public class MultiBucketTableScanLogic extends AbstractTableScanLogic<Tuple2<Spl
                         .copy(compactOptions(isStreaming));
         tablesMap.put(identifier, bucketsTable);
         scansMap.put(identifier, bucketsTable.newReadBuilder().newStreamScan());
+    }
+
+    @Override
+    String bucketType() {
+        return "multi-bucket";
     }
 }

@@ -39,10 +39,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class CompactionFileScanner<T> {
     protected final AtomicBoolean isRunning;
 
-    protected final AbstractTableScanLogic<T> tableScanLogic;
+    protected final AbstractBucketScanLogic<T> tableScanLogic;
 
     public CompactionFileScanner(
-            AtomicBoolean isRunning, AbstractTableScanLogic<T> tableScanLogic) {
+            AtomicBoolean isRunning, AbstractBucketScanLogic<T> tableScanLogic) {
         this.isRunning = isRunning;
         this.tableScanLogic = tableScanLogic;
     }

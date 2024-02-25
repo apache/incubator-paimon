@@ -38,15 +38,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 /**
- * This class is responsible for implementing the scanning logic {@link AbstractTableScanLogic} for
+ * This class is responsible for implementing the scanning logic {@link AbstractBucketScanLogic} for
  * the table with fix single bucket such as unaware bucket table.
  */
-public class UnwareBucketTableScanLogic extends AbstractTableScanLogic<AppendOnlyCompactionTask> {
-    private static final Logger LOG = LoggerFactory.getLogger(UnwareBucketTableScanLogic.class);
+public class UnwareBucketScanLogic extends AbstractBucketScanLogic<AppendOnlyCompactionTask> {
+    private static final Logger LOG = LoggerFactory.getLogger(UnwareBucketScanLogic.class);
 
     protected transient Map<Identifier, AppendOnlyTableCompactionCoordinator> tablesMap;
 
-    public UnwareBucketTableScanLogic(
+    public UnwareBucketScanLogic(
             Catalog.Loader catalogLoader,
             Pattern includingPattern,
             Pattern excludingPattern,
@@ -109,5 +109,10 @@ public class UnwareBucketTableScanLogic extends AbstractTableScanLogic<AppendOnl
                     identifier,
                     new AppendOnlyTableCompactionCoordinator(fileStoreTable, isStreaming));
         }
+    }
+
+    @Override
+    String bucketType() {
+        return "unaware-bucket";
     }
 }

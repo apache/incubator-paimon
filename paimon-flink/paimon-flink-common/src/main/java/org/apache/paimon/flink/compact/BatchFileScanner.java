@@ -19,6 +19,8 @@
 package org.apache.paimon.flink.compact;
 
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,8 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * CompactionFileScanner}.
  */
 public class BatchFileScanner<T> extends CompactionFileScanner<T> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BatchFileScanner.class);
 
-    public BatchFileScanner(AtomicBoolean isRunning, AbstractTableScanLogic<T> tableScanLogic) {
+    public BatchFileScanner(AtomicBoolean isRunning, AbstractBucketScanLogic<T> tableScanLogic) {
         super(isRunning, tableScanLogic);
     }
 
@@ -40,8 +43,10 @@ public class BatchFileScanner<T> extends CompactionFileScanner<T> {
                 return;
             }
             if (isEmpty) {
-                throw new Exception(
-                        "No file were collected. Please ensure there are tables detected after pattern matching");
+                //Currently, in the combine mode, scan tasks for two different bucket tables are running concurrently.
+                //Given that there is only one type of bucket, only one task will encounter data,
+                //therefore an exception should not be thrown here.
+                LOGGER.info("No file were collected for the table of {}", tableScanLogic.bucketType());
             }
         }
     }

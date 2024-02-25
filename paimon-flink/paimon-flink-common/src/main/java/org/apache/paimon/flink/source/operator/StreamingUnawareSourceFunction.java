@@ -20,9 +20,9 @@ package org.apache.paimon.flink.source.operator;
 
 import org.apache.paimon.append.AppendOnlyCompactionTask;
 import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.flink.compact.AbstractTableScanLogic;
+import org.apache.paimon.flink.compact.AbstractBucketScanLogic;
 import org.apache.paimon.flink.compact.StreamingFileScanner;
-import org.apache.paimon.flink.compact.UnwareBucketTableScanLogic;
+import org.apache.paimon.flink.compact.UnwareBucketScanLogic;
 import org.apache.paimon.flink.sink.CompactionTaskTypeInfo;
 
 import org.apache.flink.api.connector.source.Boundedness;
@@ -58,8 +58,8 @@ public class StreamingUnawareSourceFunction
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
 
-        AbstractTableScanLogic<AppendOnlyCompactionTask> unwareBucketTableScanLogic =
-                new UnwareBucketTableScanLogic(
+        AbstractBucketScanLogic<AppendOnlyCompactionTask> unwareBucketTableScanLogic =
+                new UnwareBucketScanLogic(
                         catalogLoader,
                         includingPattern,
                         excludingPattern,

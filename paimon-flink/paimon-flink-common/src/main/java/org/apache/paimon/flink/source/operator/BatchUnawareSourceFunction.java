@@ -20,9 +20,9 @@ package org.apache.paimon.flink.source.operator;
 
 import org.apache.paimon.append.AppendOnlyCompactionTask;
 import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.flink.compact.AbstractTableScanLogic;
+import org.apache.paimon.flink.compact.AbstractBucketScanLogic;
 import org.apache.paimon.flink.compact.BatchFileScanner;
-import org.apache.paimon.flink.compact.UnwareBucketTableScanLogic;
+import org.apache.paimon.flink.compact.UnwareBucketScanLogic;
 import org.apache.paimon.flink.sink.CompactionTaskTypeInfo;
 
 import org.apache.flink.api.connector.source.Boundedness;
@@ -61,8 +61,8 @@ public class BatchUnawareSourceFunction
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        AbstractTableScanLogic<AppendOnlyCompactionTask> unawareBucketTableScanLogic =
-                new UnwareBucketTableScanLogic(
+        AbstractBucketScanLogic<AppendOnlyCompactionTask> unawareBucketTableScanLogic =
+                new UnwareBucketScanLogic(
                         catalogLoader,
                         includingPattern,
                         excludingPattern,

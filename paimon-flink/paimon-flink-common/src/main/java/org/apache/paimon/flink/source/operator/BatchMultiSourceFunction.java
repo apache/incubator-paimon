@@ -19,9 +19,9 @@
 package org.apache.paimon.flink.source.operator;
 
 import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.flink.compact.AbstractTableScanLogic;
+import org.apache.paimon.flink.compact.AbstractBucketScanLogic;
 import org.apache.paimon.flink.compact.BatchFileScanner;
-import org.apache.paimon.flink.compact.MultiBucketTableScanLogic;
+import org.apache.paimon.flink.compact.MultiBucketScanLogic;
 import org.apache.paimon.flink.utils.JavaTypeInfo;
 import org.apache.paimon.table.source.DataSplit;
 import org.apache.paimon.table.source.Split;
@@ -63,8 +63,8 @@ public class BatchMultiSourceFunction
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
 
-        AbstractTableScanLogic<Tuple2<Split, String>> multiBucketTableScanLogic =
-                new MultiBucketTableScanLogic(
+        AbstractBucketScanLogic<Tuple2<Split, String>> multiBucketTableScanLogic =
+                new MultiBucketScanLogic(
                         catalogLoader,
                         includingPattern,
                         excludingPattern,

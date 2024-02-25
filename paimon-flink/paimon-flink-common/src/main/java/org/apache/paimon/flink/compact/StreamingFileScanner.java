@@ -32,7 +32,7 @@ public class StreamingFileScanner<T> extends CompactionFileScanner<T> {
 
     public StreamingFileScanner(
             long monitorInterval,
-            AbstractTableScanLogic<T> tableScanLogic,
+            AbstractBucketScanLogic<T> tableScanLogic,
             AtomicBoolean isRunning) {
         super(isRunning, tableScanLogic);
         this.monitorInterval = monitorInterval;
