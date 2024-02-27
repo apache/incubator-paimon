@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  * source builder to build a Flink compactor source for multi-tables. This is for dedicated
  * compactor jobs in combined mode.
  */
-public class CombineCompactorSourceBuilder {
+public class CombinedTableCompactorSourceBuilder {
     private final Catalog.Loader catalogLoader;
     private final Pattern includingPattern;
     private final Pattern excludingPattern;
@@ -50,7 +50,7 @@ public class CombineCompactorSourceBuilder {
     private boolean isContinuous = false;
     private StreamExecutionEnvironment env;
 
-    public CombineCompactorSourceBuilder(
+    public CombinedTableCompactorSourceBuilder(
             Catalog.Loader catalogLoader,
             Pattern databasePattern,
             Pattern includingPattern,
@@ -63,12 +63,12 @@ public class CombineCompactorSourceBuilder {
         this.monitorInterval = monitorInterval;
     }
 
-    public CombineCompactorSourceBuilder withContinuousMode(boolean isContinuous) {
+    public CombinedTableCompactorSourceBuilder withContinuousMode(boolean isContinuous) {
         this.isContinuous = isContinuous;
         return this;
     }
 
-    public CombineCompactorSourceBuilder withEnv(StreamExecutionEnvironment env) {
+    public CombinedTableCompactorSourceBuilder withEnv(StreamExecutionEnvironment env) {
         this.env = env;
         return this;
     }

@@ -66,8 +66,9 @@ import java.util.regex.Pattern;
 import static org.apache.paimon.utils.SerializationUtils.deserializeBinaryRow;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** IT cases for {@link CombineCompactorSourceBuilder}. */
-public class CombineCompactorSourceBuilderITCase extends AbstractTestBase implements Serializable {
+/** IT cases for {@link CombinedTableCompactorSourceBuilder}. */
+public class CombinedTableCompactorSourceBuilderITCase extends AbstractTestBase
+        implements Serializable {
     private String warehouse;
     private Options catalogOptions;
 
@@ -159,7 +160,7 @@ public class CombineCompactorSourceBuilderITCase extends AbstractTestBase implem
         env.setRuntimeMode(RuntimeExecutionMode.BATCH);
         env.setParallelism(ThreadLocalRandom.current().nextInt(2) + 1);
         DataStream<RowData> source =
-                new CombineCompactorSourceBuilder(
+                new CombinedTableCompactorSourceBuilder(
                                 catalogLoader(),
                                 Pattern.compile("db1|db2"),
                                 Pattern.compile(".*"),
@@ -255,7 +256,7 @@ public class CombineCompactorSourceBuilderITCase extends AbstractTestBase implem
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         DataStream<RowData> compactorSource =
-                new CombineCompactorSourceBuilder(
+                new CombinedTableCompactorSourceBuilder(
                                 catalogLoader(),
                                 Pattern.compile(".*"),
                                 Pattern.compile(".*"),
@@ -424,7 +425,7 @@ public class CombineCompactorSourceBuilderITCase extends AbstractTestBase implem
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         DataStream<RowData> compactorSource =
-                new CombineCompactorSourceBuilder(
+                new CombinedTableCompactorSourceBuilder(
                                 catalogLoader(),
                                 Pattern.compile(".*"),
                                 Pattern.compile("db1.+|db2.t1|db3.t1"),

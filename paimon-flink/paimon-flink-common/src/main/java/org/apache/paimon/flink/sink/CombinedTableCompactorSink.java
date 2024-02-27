@@ -48,7 +48,7 @@ import static org.apache.paimon.flink.utils.ManagedMemoryUtils.declareManagedMem
 import static org.apache.paimon.utils.Preconditions.checkArgument;
 
 /** A sink for processing multi-tables in dedicated compaction job. */
-public class CombineModeCompactorSink implements Serializable {
+public class CombinedTableCompactorSink implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private static final String WRITER_NAME = "Writer";
@@ -59,7 +59,7 @@ public class CombineModeCompactorSink implements Serializable {
 
     private final Options options;
 
-    public CombineModeCompactorSink(Catalog.Loader catalogLoader, Options options) {
+    public CombinedTableCompactorSink(Catalog.Loader catalogLoader, Options options) {
         this.catalogLoader = catalogLoader;
         this.ignorePreviousFiles = false;
         this.options = options;

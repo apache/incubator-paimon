@@ -30,10 +30,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * @param <T> the result of scanning file :
  *     <ol>
- *       <li>the splits {@link Split} for the table with multi buckets, such as dynamic or fixed
- *           bucket table.
- *       <li>the compaction task {@link AppendOnlyCompactionTask} for the table witch fixed single
- *           bucket ,such as unaware bucket table.
+ *       <li>{@link Split} for the table with multi buckets, such as dynamic or fixed bucket table.
+ *       <li>{@link AppendOnlyCompactionTask} for the table witch fixed single bucket ,such as
+ *           unaware bucket table.
  *     </ol>
  */
 public abstract class CompactionFileScanner<T> {
