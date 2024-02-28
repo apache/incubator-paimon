@@ -24,7 +24,7 @@ import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.utils.ObjectSerializer;
 
-/** Serializer for Identifier. */
+/** Serializer for {@link Identifier}.*/
 public class IdentifierSerializer extends ObjectSerializer<Identifier> {
 
     public IdentifierSerializer() {

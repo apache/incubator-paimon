@@ -43,10 +43,9 @@ public class BatchFileScanner<T> extends CompactionFileScanner<T> {
                 return;
             }
             if (isEmpty) {
-                // Currently, in the combine mode, scan tasks for two different bucket tables are
+                // Currently, in the combined mode, there are two scan tasks for the table of two different bucket type (multi bucket & unaware bucket)  are
                 // running concurrently.
-                // Given that there is only one type of bucket, only one task will encounter data,
-                // therefore an exception should not be thrown here.
+                // There will be a situation that there is only one task compaction , therefore this should not be thrown exception here.
                 LOGGER.info(
                         "No file were collected for the table of {}", tableScanLogic.bucketType());
             }

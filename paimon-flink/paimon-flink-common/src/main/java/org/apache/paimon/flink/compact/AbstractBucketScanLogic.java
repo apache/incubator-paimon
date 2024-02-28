@@ -36,14 +36,14 @@ import java.util.regex.Pattern;
 import static org.apache.paimon.flink.utils.MultiTablesCompactorUtil.shouldCompactTable;
 
 /**
- * This class is responsible for implementing the scanning logic of different buckets during table
+ * This class is responsible for implementing the scanning logic for the table of different type buckets during
  * compaction.
  *
  * @param <T> the result of scanning file :
  *     <ol>
- *       <li>the splits {@link Split} for the table with multi buckets, such as dynamic or fixed
+ *       <li>{@link Split} for the table with multi buckets, such as dynamic or fixed
  *           bucket table.
- *       <li>the compaction task {@link AppendOnlyCompactionTask} for the table witch fixed single
+ *       <li>{@link AppendOnlyCompactionTask} for the table witch fixed single
  *           bucket ,such as unaware bucket table.
  *     </ol>
  */

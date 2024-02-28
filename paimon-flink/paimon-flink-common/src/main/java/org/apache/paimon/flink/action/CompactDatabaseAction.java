@@ -198,7 +198,7 @@ public class CompactDatabaseAction extends ActionBase {
                         excludingPattern,
                         tableOptions.get(CoreOptions.CONTINUOUS_DISCOVERY_INTERVAL).toMillis());
 
-        // multi bucket table
+        // multi bucket table which has multi bucket in a partition like fix bucket and dynamic bucket
         DataStream<RowData> multiBucketTableSource =
                 partition(
                         sourceBuilder
