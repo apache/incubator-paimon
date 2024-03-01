@@ -1099,13 +1099,6 @@ public class CoreOptions implements Serializable {
                     .withDescription(
                             "The kms client for encryption, if the user has enabled encryption, the kms client must be specified.");
 
-    public static final ConfigOption<String> HADOOP_SECURITY =
-            key("hadoop.security.#")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "If user use the hadoop KMS, parameters prefixed with `hadoop.security.` can be added, the `hadoop.security.key.provider.path` is required. For more information, please see https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/core-default.xml.");
-
     public static final ConfigOption<String> ENCRYPTION_COLUMNS =
             key("encryption.columns")
                     .stringType()
@@ -2326,8 +2319,14 @@ public class CoreOptions implements Serializable {
 
     /** The kms client for encryption. */
     public enum EncryptionKmsClient implements DescribedEnum {
-        MEMORY("memory", "Use memory kms for encryption, this is only for test."),
-        HADOOP("hadoop", "Use hadoop kms for encryption.");
+        MEMORY(
+                "memory",
+                "Use memory kms for encryption, this is only for test, can not be used in production environment."),
+        HADOOP(
+                "hadoop",
+                "Use hadoop kms for encryption, parameters prefixed with `hadoop.security.` will be used to build hadoop kms client, "
+                        + "the `hadoop.security.key.provider.path` is required. The hadoop parameters can be configured from catalog or environment，"
+                        + "please refer to `https://paimon.apache.org/docs/master/filesystems/hdfs/#hdfs-configuration`.");
 
         private final String value;
         private final String description;

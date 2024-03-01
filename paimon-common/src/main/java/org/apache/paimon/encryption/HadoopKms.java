@@ -19,6 +19,7 @@
 package org.apache.paimon.encryption;
 
 import org.apache.paimon.options.Options;
+import org.apache.paimon.utils.HadoopUtils;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -29,15 +30,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Map;
 import java.util.UUID;
 
 /** Hadoop KMS client. */
 public class HadoopKms extends KmsClientBase {
 
     public static final String IDENTIFIER = "hadoop";
-
-    private static final String CONFIG_PREFIX = "hadoop.security.";
 
     private Options options;
 
@@ -46,20 +44,8 @@ public class HadoopKms extends KmsClientBase {
         this.options = options;
     }
 
-    private Configuration getHadoopConf() {
-        Map<String, String> confMap = options.toMap();
-        Configuration hadoopConf = new Configuration();
-        for (Map.Entry<String, String> conf : confMap.entrySet()) {
-            if (conf.getKey().startsWith(CONFIG_PREFIX)) {
-                hadoopConf.set(conf.getKey(), conf.getValue());
-            }
-        }
-        return hadoopConf;
-    }
-
     private KeyProvider createProvider(Configuration configuration) {
-        Map<String, String> confMap = this.options.toMap();
-        if (!confMap.containsKey(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH)) {
+        if (!options.containsKey(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH)) {
             throw new IllegalArgumentException(
                     CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH
                             + " is required for hadoop kms.");
@@ -69,7 +55,7 @@ public class HadoopKms extends KmsClientBase {
         try {
             URI uri =
                     new URI(
-                            confMap.get(
+                            options.get(
                                     CommonConfigurationKeysPublic
                                             .HADOOP_SECURITY_KEY_PROVIDER_PATH));
 
@@ -83,13 +69,15 @@ public class HadoopKms extends KmsClientBase {
     @Override
     public CreateKeyResult createKey() {
         // HadoopKms must be serializable, but KeyProvider is not serializable, so KeyProvider
-        // cannot be used as a class variable
+        // cannot be used as a class variable.
         KeyProvider keyProvider = null;
         try {
-            keyProvider = createProvider(getHadoopConf());
+            keyProvider = createProvider(HadoopUtils.getHadoopConfiguration(options));
             String keyId = UUID.randomUUID().toString().replace("-", "");
             KeyProvider.KeyVersion keyVersion =
-                    keyProvider.createKey(keyId, new KeyProvider.Options(getHadoopConf()));
+                    keyProvider.createKey(
+                            keyId,
+                            new KeyProvider.Options(HadoopUtils.getHadoopConfiguration(options)));
             return new CreateKeyResult(keyId, keyVersion.getMaterial());
         } catch (NoSuchAlgorithmException | IOException e) {
             throw new RuntimeException("Create key error, ", e);
@@ -99,7 +87,7 @@ public class HadoopKms extends KmsClientBase {
                     keyProvider.close();
                 }
             } catch (IOException e) {
-                throw new RuntimeException("Close hadoop keyProvider error, ", e);
+                throw new RuntimeException(e);
             }
         }
     }
@@ -108,8 +96,10 @@ public class HadoopKms extends KmsClientBase {
     public byte[] getKey(String keyId) {
         KeyProvider keyProvider = null;
         try {
-            keyProvider = createProvider(getHadoopConf());
-            return createProvider(getHadoopConf()).getCurrentKey(keyId).getMaterial();
+            keyProvider = createProvider(HadoopUtils.getHadoopConfiguration(options));
+            return createProvider(HadoopUtils.getHadoopConfiguration(options))
+                    .getCurrentKey(keyId)
+                    .getMaterial();
         } catch (IOException e) {
             throw new RuntimeException("Get key error: ", e);
         } finally {
@@ -118,7 +108,7 @@ public class HadoopKms extends KmsClientBase {
                     keyProvider.close();
                 }
             } catch (IOException e) {
-                throw new RuntimeException("Close hadoop keyProvider error, ", e);
+                throw new RuntimeException(e);
             }
         }
     }

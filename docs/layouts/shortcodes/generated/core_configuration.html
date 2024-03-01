@@ -741,7 +741,7 @@ This config option does not affect the default filesystem metastore.</td>
             <td><h5>encryption.kms-client</h5></td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>Enum</td>
-            <td>The kms client for encryption, if the user has enabled encryption, the kms client must be specified.<br /><br />Possible values:<ul><li>"memory": Use memory kms for encryption, this is only for test.</li><li>"hadoop": Use hadoop kms for encryption.</li></ul></li></ul></td>
+            <td>The kms client for encryption, if the user has enabled encryption, the kms client must be specified.<br /><br />Possible values:<ul><li>"memory": Use memory kms for encryption, this is only for test, can not be used in production environment.</li><li>"hadoop": Use hadoop kms for encryption, parameters prefixed with `hadoop.security.` will be used to build hadoop kms client, the `hadoop.security.key.provider.path` is required. The hadoop parameters can be configured from catalog or environment，please refer to `https://paimon.apache.org/docs/master/filesystems/hdfs/#hdfs-configuration`.</li></ul></td>
         </tr>
         <tr>
             <td><h5>encryption.columns</h5></td>
@@ -754,12 +754,6 @@ This config option does not affect the default filesystem metastore.</td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>String</td>
             <td>Encryption algorithm for encrypting data files, for parquet format, the value can be `AES_GCM_V1` or `AES_GCM_CTR_V1`, and the default value is `AES_GCM_CTR_V1`. And can not specify algorithm for orc format now.</td>
-        </tr>
-        <tr>
-            <td><h5>hadoop.security.#</h5></td>
-            <td style="word-wrap: break-word;">(none)</td>
-            <td>String</td>
-            <td>If user use the hadoop KMS, parameters prefixed with `hadoop.security.` can be added, the `hadoop.security.key.provider.path` is required. For more information, please see https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/core-default.xml.</td>
         </tr>
     </tbody>
 </table>
