@@ -56,6 +56,7 @@ public abstract class FullCacheLookupTable implements LookupTable {
     protected final RocksDBStateFactory stateFactory;
     protected final RowType projectedType;
     private final boolean sequenceFieldEnabled;
+    protected final boolean deduplicateIgnoreDelete;
 
     private LookupStreamingReader reader;
     private Predicate specificPartition;
@@ -71,6 +72,7 @@ public abstract class FullCacheLookupTable implements LookupTable {
         this.sequenceFieldEnabled =
                 table.primaryKeys().size() > 0
                         && new CoreOptions(table.options()).sequenceField().isPresent();
+        this.deduplicateIgnoreDelete = new CoreOptions(table.options()).deduplicateIgnoreDelete();
         RowType projectedType = TypeUtils.project(table.rowType(), context.projection);
         if (sequenceFieldEnabled) {
             projectedType = projectedType.appendDataField(SEQUENCE_NUMBER, DataTypes.BIGINT());
