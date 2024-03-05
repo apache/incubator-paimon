@@ -112,9 +112,12 @@ public class AppendOnlyFileStoreTableTest extends FileStoreTableTestBase {
     public void testBranchBatchReadWrite() throws Exception {
         FileStoreTable table = createFileStoreTable();
         generateBranch(table);
-        writeBranchData(table);
-        List<Split> splits = toSplits(table.newSnapshotReader(BRANCH_NAME).read().dataSplits());
-        TableRead read = table.newRead();
+
+        FileStoreTable tableBranch = createFileStoreTable(BRANCH_NAME);
+        writeBranchData(tableBranch);
+        List<Split> splits =
+                toSplits(tableBranch.newSnapshotReader(BRANCH_NAME).read().dataSplits());
+        TableRead read = tableBranch.newRead();
         assertThat(getResult(read, splits, binaryRow(1), 0, BATCH_ROW_TO_STRING))
                 .hasSameElementsAs(
                         Arrays.asList(
@@ -292,15 +295,18 @@ public class AppendOnlyFileStoreTableTest extends FileStoreTableTestBase {
     public void testBranchStreamingReadWrite() throws Exception {
         FileStoreTable table = createFileStoreTable();
         generateBranch(table);
-        writeBranchData(table);
+
+        FileStoreTable tableBranch = createFileStoreTable(BRANCH_NAME);
+        writeBranchData(tableBranch);
 
         List<Split> splits =
                 toSplits(
-                        table.newSnapshotReader(BRANCH_NAME)
+                        tableBranch
+                                .newSnapshotReader(BRANCH_NAME)
                                 .withMode(ScanMode.DELTA)
                                 .read()
                                 .dataSplits());
-        TableRead read = table.newRead();
+        TableRead read = tableBranch.newRead();
 
         assertThat(getResult(read, splits, binaryRow(1), 0, STREAMING_ROW_TO_STRING))
                 .isEqualTo(
@@ -554,6 +560,25 @@ public class AppendOnlyFileStoreTableTest extends FileStoreTableTestBase {
         TableSchema tableSchema =
                 SchemaUtils.forceCommit(
                         new SchemaManager(LocalFileIO.create(), tablePath),
+                        new Schema(
+                                ROW_TYPE.getFields(),
+                                Collections.singletonList("pt"),
+                                Collections.emptyList(),
+                                conf.toMap(),
+                                ""));
+        return new AppendOnlyFileStoreTable(FileIOFinder.find(tablePath), tablePath, tableSchema);
+    }
+
+    @Override
+    protected FileStoreTable createFileStoreTable(String branch, Consumer<Options> configure)
+            throws Exception {
+        Options conf = new Options();
+        conf.set(CoreOptions.PATH, tablePath.toString());
+        conf.set(CoreOptions.BRANCH, branch);
+        configure.accept(conf);
+        TableSchema tableSchema =
+                SchemaUtils.forceCommit(
+                        new SchemaManager(LocalFileIO.create(), tablePath, branch),
                         new Schema(
                                 ROW_TYPE.getFields(),
                                 Collections.singletonList("pt"),

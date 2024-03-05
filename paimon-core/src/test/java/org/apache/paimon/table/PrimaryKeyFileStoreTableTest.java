@@ -77,6 +77,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static org.apache.paimon.CoreOptions.BRANCH;
 import static org.apache.paimon.CoreOptions.BUCKET;
 import static org.apache.paimon.CoreOptions.CHANGELOG_PRODUCER;
 import static org.apache.paimon.CoreOptions.ChangelogProducer.LOOKUP;
@@ -247,9 +248,11 @@ public class PrimaryKeyFileStoreTableTest extends FileStoreTableTestBase {
     public void testBranchBatchReadWrite() throws Exception {
         FileStoreTable table = createFileStoreTable();
         generateBranch(table);
-        writeBranchData(table);
-        List<Split> splits = toSplits(table.newSnapshotReader(BRANCH_NAME).read().dataSplits());
-        TableRead read = table.newRead();
+        FileStoreTable tableBranch = createFileStoreTable(BRANCH_NAME);
+        writeBranchData(tableBranch);
+        List<Split> splits =
+                toSplits(tableBranch.newSnapshotReader(BRANCH_NAME).read().dataSplits());
+        TableRead read = tableBranch.newRead();
         assertThat(getResult(read, splits, binaryRow(1), 0, BATCH_ROW_TO_STRING))
                 .isEqualTo(
                         Collections.singletonList(
@@ -318,15 +321,18 @@ public class PrimaryKeyFileStoreTableTest extends FileStoreTableTestBase {
     public void testBranchStreamingReadWrite() throws Exception {
         FileStoreTable table = createFileStoreTable();
         generateBranch(table);
-        writeBranchData(table);
+
+        FileStoreTable tableBranch = createFileStoreTable(BRANCH_NAME);
+        writeBranchData(tableBranch);
 
         List<Split> splits =
                 toSplits(
-                        table.newSnapshotReader(BRANCH_NAME)
+                        tableBranch
+                                .newSnapshotReader(BRANCH_NAME)
                                 .withMode(ScanMode.DELTA)
                                 .read()
                                 .dataSplits());
-        TableRead read = table.newRead();
+        TableRead read = tableBranch.newRead();
         assertThat(getResult(read, splits, binaryRow(1), 0, STREAMING_ROW_TO_STRING))
                 .isEqualTo(
                         Collections.singletonList(
@@ -1475,6 +1481,31 @@ public class PrimaryKeyFileStoreTableTest extends FileStoreTableTestBase {
         Options options = new Options();
         options.set(CoreOptions.PATH, tablePath.toString());
         options.set(BUCKET, 1);
+        configure.accept(options);
+        TableSchema tableSchema =
+                SchemaUtils.forceCommit(
+                        new SchemaManager(LocalFileIO.create(), tablePath),
+                        new Schema(
+                                rowType.getFields(),
+                                Collections.singletonList("pt"),
+                                Arrays.asList("pt", "a"),
+                                options.toMap(),
+                                ""));
+        return new PrimaryKeyFileStoreTable(FileIOFinder.find(tablePath), tablePath, tableSchema);
+    }
+
+    @Override
+    protected FileStoreTable createFileStoreTable(String branch, Consumer<Options> configure)
+            throws Exception {
+        return createFileStoreTable(branch, configure, ROW_TYPE);
+    }
+
+    private FileStoreTable createFileStoreTable(
+            String branch, Consumer<Options> configure, RowType rowType) throws Exception {
+        Options options = new Options();
+        options.set(CoreOptions.PATH, tablePath.toString());
+        options.set(BUCKET, 1);
+        options.set(BRANCH, branch);
         configure.accept(options);
         TableSchema tableSchema =
                 SchemaUtils.forceCommit(

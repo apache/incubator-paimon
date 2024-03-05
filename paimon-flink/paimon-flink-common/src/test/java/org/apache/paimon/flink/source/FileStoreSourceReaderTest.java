@@ -28,6 +28,7 @@ import org.apache.paimon.types.BigIntType;
 import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.IntType;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.utils.BranchManager;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
@@ -56,6 +57,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class FileStoreSourceReaderTest {
 
     @TempDir protected java.nio.file.Path tempDir;
+
+    protected String branch = BranchManager.DEFAULT_MAIN_BRANCH;
 
     @BeforeEach
     public void beforeEach() throws Exception {
@@ -138,7 +141,7 @@ public class FileStoreSourceReaderTest {
     protected FileStoreSourceReader createReader(TestingReaderContext context) {
         return new FileStoreSourceReader(
                 context,
-                new TestChangelogDataReadWrite(tempDir.toString()).createReadWithKey(),
+                new TestChangelogDataReadWrite(tempDir.toString()).createReadWithKey(branch),
                 new FileStoreSourceReaderMetrics(new DummyMetricGroup()),
                 IOManager.create(tempDir.toString()),
                 null);

@@ -71,7 +71,7 @@ public class AppendOnlyFileStore extends AbstractFileStore<InternalRow> {
 
     @Override
     public AppendOnlyFileStoreScan newScan() {
-        return newScan(DEFAULT_MAIN_BRANCH);
+        return newScan(options.branch());
     }
 
     public AppendOnlyFileStoreScan newScan(String branchName) {
@@ -144,8 +144,7 @@ public class AppendOnlyFileStore extends AbstractFileStore<InternalRow> {
                 manifestListFactory(forWrite),
                 options.bucket(),
                 forWrite,
-                options.scanManifestParallelism(),
-                branchName);
+                options.scanManifestParallelism());
     }
 
     @Override

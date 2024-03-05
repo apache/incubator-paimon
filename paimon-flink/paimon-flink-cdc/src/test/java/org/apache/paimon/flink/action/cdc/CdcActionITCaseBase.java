@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static org.apache.paimon.CoreOptions.BRANCH;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** CDC IT case base. */
@@ -70,6 +71,16 @@ public class CdcActionITCaseBase extends ActionITCaseBase {
         env.setParallelism(2);
         env.enableCheckpointing(1000);
         env.setRestartStrategy(RestartStrategies.noRestart());
+    }
+
+    protected Map<String, String> getCatalogOptions(Map<String, String> catalogOptions) {
+        catalogOptions.put(BRANCH.key(), branch);
+        return catalogOptions;
+    }
+
+    protected Map<String, String> getTableConfig(Map<String, String> tableConfig) {
+        //        tableConfig.put(BRANCH.key(), branch);
+        return tableConfig;
     }
 
     @AfterEach

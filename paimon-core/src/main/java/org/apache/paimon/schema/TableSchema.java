@@ -104,7 +104,8 @@ public class TableSchema implements Serializable {
         this.highestFieldId = highestFieldId;
         this.partitionKeys = partitionKeys;
         this.primaryKeys = primaryKeys;
-        this.options = Collections.unmodifiableMap(options);
+        Objects.requireNonNull(options);
+        this.options = options;
         this.comment = comment;
         this.timeMillis = timeMillis;
 

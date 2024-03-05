@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.sink.cdc;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.annotation.Experimental;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
@@ -106,7 +107,10 @@ public class CdcSinkBuilder<T> {
                                 parsed, CdcParsingProcessFunction.NEW_DATA_FIELD_LIST_OUTPUT_TAG)
                         .process(
                                 new UpdatedDataFieldsProcessFunction(
-                                        new SchemaManager(dataTable.fileIO(), dataTable.location()),
+                                        new SchemaManager(
+                                                dataTable.fileIO(),
+                                                dataTable.location(),
+                                                CoreOptions.branch(dataTable.options())),
                                         identifier,
                                         catalogLoader));
         schemaChangeProcessFunction.getTransformation().setParallelism(1);

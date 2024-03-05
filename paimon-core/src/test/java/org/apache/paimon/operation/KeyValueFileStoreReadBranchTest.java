@@ -57,6 +57,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -66,9 +67,11 @@ import static org.apache.paimon.utils.Preconditions.checkArgument;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link KeyValueFileStoreRead}. */
-public class KeyValueFileStoreReadTest {
+public class KeyValueFileStoreReadBranchTest {
 
     @TempDir java.nio.file.Path tempDir;
+
+    private String branch = UUID.randomUUID() + "-branch";
 
     @Test
     public void testKeyProjection() throws Exception {
@@ -263,22 +266,26 @@ public class KeyValueFileStoreReadTest {
             MergeFunctionFactory<KeyValue> mfFactory)
             throws Exception {
         Path path = new Path(tempDir.toUri());
-        SchemaManager schemaManager = new SchemaManager(FileIOFinder.find(path), path);
+        SchemaManager schemaManager = new SchemaManager(FileIOFinder.find(path), path, branch);
         boolean valueCountMode = mfFactory.create() instanceof TestValueCountMergeFunction;
-        Schema schema =
-                new Schema(
-                        (valueCountMode ? keyType : valueType).getFields(),
-                        partitionType.getFieldNames(),
-                        valueCountMode
-                                ? Collections.emptyList()
-                                : Stream.concat(
-                                                keyType.getFieldNames().stream()
-                                                        .map(field -> field.replace("key_", "")),
-                                                partitionType.getFieldNames().stream())
-                                        .collect(Collectors.toList()),
-                        Collections.emptyMap(),
-                        null);
-        TableSchema tableSchema = schemaManager.createTable(schema);
+        TableSchema tableSchema =
+                schemaManager.createTable(
+                        new Schema(
+                                (valueCountMode ? keyType : valueType).getFields(),
+                                partitionType.getFieldNames(),
+                                valueCountMode
+                                        ? Collections.emptyList()
+                                        : Stream.concat(
+                                                        keyType.getFieldNames().stream()
+                                                                .map(
+                                                                        field ->
+                                                                                field.replace(
+                                                                                        "key_",
+                                                                                        "")),
+                                                        partitionType.getFieldNames().stream())
+                                                .collect(Collectors.toList()),
+                                Collections.emptyMap(),
+                                null));
         return new TestFileStore.Builder(
                         "avro",
                         tempDir.toString(),
@@ -288,7 +295,8 @@ public class KeyValueFileStoreReadTest {
                         valueType,
                         extractor,
                         mfFactory,
-                        tableSchema)
+                        tableSchema,
+                        branch)
                 .build();
     }
 

@@ -104,7 +104,7 @@ public abstract class AbstractFileStore<T> implements FileStore<T> {
 
     @Override
     public SnapshotManager snapshotManager() {
-        return new SnapshotManager(fileIO, options.path());
+        return new SnapshotManager(fileIO, options.path(), options.branch());
     }
 
     @Override
