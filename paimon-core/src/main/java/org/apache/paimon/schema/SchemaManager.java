@@ -96,10 +96,7 @@ public class SchemaManager implements Serializable {
     }
 
     public Optional<TableSchema> latest(String branchName) {
-        Path directoryPath =
-                branchName.equals(DEFAULT_MAIN_BRANCH)
-                        ? schemaDirectory()
-                        : branchSchemaDirectory(branchName);
+        Path directoryPath = schemaDirectory(branchName);
         try {
             return listVersionedFiles(fileIO, directoryPath, SCHEMA_PREFIX)
                     .reduce(Math::max)
@@ -483,21 +480,24 @@ public class SchemaManager implements Serializable {
     }
 
     private Path schemaDirectory() {
-        return new Path(tableRoot + "/schema");
+        return schemaDirectory(DEFAULT_MAIN_BRANCH);
     }
 
     @VisibleForTesting
     public Path toSchemaPath(long id) {
-        return new Path(tableRoot + "/schema/" + SCHEMA_PREFIX + id);
+        return toSchemaPath(DEFAULT_MAIN_BRANCH, id);
     }
 
-    public Path branchSchemaDirectory(String branchName) {
-        return new Path(getBranchPath(tableRoot, branchName) + "/schema");
+    public Path schemaDirectory(String branchName) {
+        return new Path(getBranchPath(fileIO, tableRoot, branchName) + "/schema");
     }
 
-    public Path branchSchemaPath(String branchName, long schemaId) {
+    public Path toSchemaPath(String branchName, long schemaId) {
         return new Path(
-                getBranchPath(tableRoot, branchName) + "/schema/" + SCHEMA_PREFIX + schemaId);
+                getBranchPath(fileIO, tableRoot, branchName)
+                        + "/schema/"
+                        + SCHEMA_PREFIX
+                        + schemaId);
     }
 
     /**

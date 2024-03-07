@@ -459,6 +459,21 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
     }
 
     @Override
+    public void cleanMainBranchFile() {
+        branchManager().cleanMainBranchFile();
+    }
+
+    @Override
+    public void replaceMainBranch(String branchName) {
+        branchManager().commitMainBranch(branchName);
+    }
+
+    @Override
+    public void mainBranch() {
+        branchManager().mainBranch();
+    }
+
+    @Override
     public void rollbackTo(String tagName) {
         TagManager tagManager = tagManager();
         checkArgument(tagManager.tagExists(tagName), "Rollback tag '%s' doesn't exist.", tagName);

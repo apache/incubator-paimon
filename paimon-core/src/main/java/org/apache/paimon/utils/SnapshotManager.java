@@ -83,12 +83,15 @@ public class SnapshotManager implements Serializable {
     }
 
     public Path branchSnapshotDirectory(String branchName) {
-        return new Path(getBranchPath(tablePath, branchName) + "/snapshot");
+        return new Path(getBranchPath(fileIO, tablePath, branchName) + "/snapshot");
     }
 
     public Path branchSnapshotPath(String branchName, long snapshotId) {
         return new Path(
-                getBranchPath(tablePath, branchName) + "/snapshot/" + SNAPSHOT_PREFIX + snapshotId);
+                getBranchPath(fileIO, tablePath, branchName)
+                        + "/snapshot/"
+                        + SNAPSHOT_PREFIX
+                        + snapshotId);
     }
 
     public Path snapshotPathByBranch(String branchName, long snapshotId) {
