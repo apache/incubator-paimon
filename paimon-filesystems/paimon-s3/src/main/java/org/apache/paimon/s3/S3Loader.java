@@ -25,8 +25,12 @@ import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.PluginFileIO;
 import org.apache.paimon.plugin.PluginLoader;
 
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** A {@link PluginLoader} to load oss. */
 public class S3Loader implements FileIOLoader {
@@ -34,6 +38,10 @@ public class S3Loader implements FileIOLoader {
     private static final String S3_CLASSES_DIR = "paimon-plugin-s3";
 
     private static final String S3_CLASS = "org.apache.paimon.s3.S3FileIO";
+
+    private static final String S3_ACCESS_KEY = "s3.access-key";
+
+    private static final String S3_SECRET_KEY = "s3.secret-key";
 
     // Singleton lazy initialization
 
@@ -55,9 +63,21 @@ public class S3Loader implements FileIOLoader {
     @Override
     public List<String[]> requiredOptions() {
         List<String[]> options = new ArrayList<>();
-        options.add(new String[] {"s3.access-key", "s3.access.key"});
-        options.add(new String[] {"s3.secret-key", "s3.secret.key"});
+        Optional<AWSCredentials> awsCredentials = getAWSCredentials();
+        if (!awsCredentials.isPresent()) {
+            options.add(new String[] {S3_ACCESS_KEY, S3_ACCESS_KEY});
+            options.add(new String[] {S3_SECRET_KEY, S3_SECRET_KEY});
+        }
         return options;
+    }
+
+    // try to load AWS credentials via default providers
+    private static Optional<AWSCredentials> getAWSCredentials() {
+        try {
+            return Optional.of(DefaultAWSCredentialsProviderChain.getInstance().getCredentials());
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     @Override
@@ -77,6 +97,12 @@ public class S3Loader implements FileIOLoader {
         @Override
         protected FileIO createFileIO(Path path) {
             FileIO fileIO = getLoader().newInstance(S3_CLASS);
+            // inject aws credentials into options for s3a
+            getAWSCredentials()
+                .ifPresent(credentials -> {
+                options.set(S3_ACCESS_KEY, credentials.getAWSAccessKeyId());
+                options.set(S3_SECRET_KEY, credentials.getAWSSecretKey());
+            });
             fileIO.configure(CatalogContext.create(options));
             return fileIO;
         }
