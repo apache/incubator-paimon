@@ -32,6 +32,7 @@ import org.apache.paimon.options.OptionsUtils;
 import org.apache.paimon.options.description.DescribedEnum;
 import org.apache.paimon.options.description.Description;
 import org.apache.paimon.options.description.InlineElement;
+import org.apache.paimon.utils.DateTimeUtils;
 import org.apache.paimon.utils.MathUtils;
 import org.apache.paimon.utils.Pair;
 import org.apache.paimon.utils.StringUtils;
@@ -50,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 import static org.apache.paimon.options.ConfigOptions.key;
@@ -493,6 +495,13 @@ public class CoreOptions implements Serializable {
                     .defaultValue(StartupMode.DEFAULT)
                     .withDeprecatedKeys("log.scan")
                     .withDescription("Specify the scanning behavior of the source.");
+
+    public static final ConfigOption<String> SCAN_TIMESTAMP =
+            key("scan.timestamp")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional timestamp used in case of \"from-timestamp\" scan mode, it will be automatically converted to timestamp in unix milliseconds, use local time zone");
 
     public static final ConfigOption<Long> SCAN_TIMESTAMP_MILLIS =
             key("scan.timestamp-millis")
@@ -1412,7 +1421,8 @@ public class CoreOptions implements Serializable {
     public static StartupMode startupMode(Options options) {
         StartupMode mode = options.get(SCAN_MODE);
         if (mode == StartupMode.DEFAULT) {
-            if (options.getOptional(SCAN_TIMESTAMP_MILLIS).isPresent()) {
+            if (options.getOptional(SCAN_TIMESTAMP_MILLIS).isPresent()
+                    || options.getOptional(SCAN_TIMESTAMP).isPresent()) {
                 return StartupMode.FROM_TIMESTAMP;
             } else if (options.getOptional(SCAN_SNAPSHOT_ID).isPresent()
                     || options.getOptional(SCAN_TAG_NAME).isPresent()
@@ -1434,7 +1444,17 @@ public class CoreOptions implements Serializable {
     }
 
     public Long scanTimestampMills() {
-        return options.get(SCAN_TIMESTAMP_MILLIS);
+        String timestampStr = scanTimestamp();
+        Long timestampMillis = options.get(SCAN_TIMESTAMP_MILLIS);
+        if (timestampMillis == null && timestampStr != null) {
+            return DateTimeUtils.parseTimestampData(timestampStr, 3, TimeZone.getDefault())
+                    .getMillisecond();
+        }
+        return timestampMillis;
+    }
+
+    public String scanTimestamp() {
+        return options.get(SCAN_TIMESTAMP);
     }
 
     public Long scanFileCreationTimeMills() {
@@ -2026,6 +2046,10 @@ public class CoreOptions implements Serializable {
      */
     public static void setDefaultValues(Options options) {
         if (options.contains(SCAN_TIMESTAMP_MILLIS) && !options.contains(SCAN_MODE)) {
+            options.set(SCAN_MODE, StartupMode.FROM_TIMESTAMP);
+        }
+
+        if (options.contains(SCAN_TIMESTAMP) && !options.contains(SCAN_MODE)) {
             options.set(SCAN_MODE, StartupMode.FROM_TIMESTAMP);
         }
 

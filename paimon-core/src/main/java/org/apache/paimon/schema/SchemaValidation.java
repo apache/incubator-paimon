@@ -58,6 +58,7 @@ import static org.apache.paimon.CoreOptions.SCAN_FILE_CREATION_TIME_MILLIS;
 import static org.apache.paimon.CoreOptions.SCAN_MODE;
 import static org.apache.paimon.CoreOptions.SCAN_SNAPSHOT_ID;
 import static org.apache.paimon.CoreOptions.SCAN_TAG_NAME;
+import static org.apache.paimon.CoreOptions.SCAN_TIMESTAMP;
 import static org.apache.paimon.CoreOptions.SCAN_TIMESTAMP_MILLIS;
 import static org.apache.paimon.CoreOptions.SNAPSHOT_NUM_RETAINED_MAX;
 import static org.apache.paimon.CoreOptions.SNAPSHOT_NUM_RETAINED_MIN;
@@ -253,8 +254,8 @@ public class SchemaValidation {
 
     private static void validateStartupMode(CoreOptions options) {
         if (options.startupMode() == CoreOptions.StartupMode.FROM_TIMESTAMP) {
-            checkOptionExistInMode(
-                    options, SCAN_TIMESTAMP_MILLIS, CoreOptions.StartupMode.FROM_TIMESTAMP);
+            checkExactOneOptionExistInMode(
+                    options, options.startupMode(), SCAN_TIMESTAMP_MILLIS, SCAN_TIMESTAMP);
             checkOptionsConflict(
                     options,
                     Arrays.asList(
@@ -263,7 +264,7 @@ public class SchemaValidation {
                             SCAN_TAG_NAME,
                             INCREMENTAL_BETWEEN_TIMESTAMP,
                             INCREMENTAL_BETWEEN),
-                    Collections.singletonList(SCAN_TIMESTAMP_MILLIS));
+                    Arrays.asList(SCAN_TIMESTAMP_MILLIS, SCAN_TIMESTAMP));
         } else if (options.startupMode() == CoreOptions.StartupMode.FROM_SNAPSHOT) {
             checkExactOneOptionExistInMode(
                     options, options.startupMode(), SCAN_SNAPSHOT_ID, SCAN_TAG_NAME);
@@ -271,6 +272,7 @@ public class SchemaValidation {
                     options,
                     Arrays.asList(
                             SCAN_TIMESTAMP_MILLIS,
+                            SCAN_TIMESTAMP,
                             SCAN_FILE_CREATION_TIME_MILLIS,
                             INCREMENTAL_BETWEEN_TIMESTAMP,
                             INCREMENTAL_BETWEEN),
@@ -287,6 +289,7 @@ public class SchemaValidation {
                             SCAN_SNAPSHOT_ID,
                             SCAN_TIMESTAMP_MILLIS,
                             SCAN_FILE_CREATION_TIME_MILLIS,
+                            SCAN_TIMESTAMP,
                             SCAN_TAG_NAME),
                     Arrays.asList(INCREMENTAL_BETWEEN, INCREMENTAL_BETWEEN_TIMESTAMP));
         } else if (options.startupMode() == CoreOptions.StartupMode.FROM_SNAPSHOT_FULL) {
@@ -295,6 +298,7 @@ public class SchemaValidation {
                     options,
                     Arrays.asList(
                             SCAN_TIMESTAMP_MILLIS,
+                            SCAN_TIMESTAMP,
                             SCAN_FILE_CREATION_TIME_MILLIS,
                             SCAN_TAG_NAME,
                             INCREMENTAL_BETWEEN_TIMESTAMP,
@@ -318,6 +322,7 @@ public class SchemaValidation {
             checkOptionNotExistInMode(options, SCAN_TIMESTAMP_MILLIS, options.startupMode());
             checkOptionNotExistInMode(
                     options, SCAN_FILE_CREATION_TIME_MILLIS, options.startupMode());
+            checkOptionNotExistInMode(options, SCAN_TIMESTAMP, options.startupMode());
             checkOptionNotExistInMode(options, SCAN_SNAPSHOT_ID, options.startupMode());
             checkOptionNotExistInMode(options, SCAN_TAG_NAME, options.startupMode());
             checkOptionNotExistInMode(
