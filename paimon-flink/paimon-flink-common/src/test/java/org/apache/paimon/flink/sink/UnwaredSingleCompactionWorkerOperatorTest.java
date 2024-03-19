@@ -42,14 +42,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-/** Tests for {@link AppendOnlyTableCompactionWorkerOperator}. */
-public class AppendOnlyTableCompactionWorkerOperatorTest extends TableTestBase {
+/** Tests for {@link UnawareDividedCompactionWorkerOperator}. */
+public class UnwaredSingleCompactionWorkerOperatorTest extends TableTestBase {
 
     @Test
     public void testAsyncCompactionWorks() throws Exception {
         createTableDefault();
-        AppendOnlyTableCompactionWorkerOperator workerOperator =
-                new AppendOnlyTableCompactionWorkerOperator(getTableDefault(), "user");
+        UnawareDividedCompactionWorkerOperator workerOperator =
+                new UnawareDividedCompactionWorkerOperator(getTableDefault(), "user");
 
         // write 200 files
         List<CommitMessage> commitMessages = writeDataDefault(200, 20);
@@ -79,7 +79,7 @@ public class AppendOnlyTableCompactionWorkerOperatorTest extends TableTestBase {
                                 if (now - timeStart > timeout && committables.size() != 4) {
                                     throw new RuntimeException(
                                             "Timeout waiting for compaction, maybe some error happens in "
-                                                    + AppendOnlyTableCompactionWorkerOperator.class
+                                                    + UnawareDividedCompactionWorkerOperator.class
                                                             .getName());
                                 }
                                 Thread.sleep(1_000L);
@@ -100,8 +100,8 @@ public class AppendOnlyTableCompactionWorkerOperatorTest extends TableTestBase {
     @Test
     public void testAsyncCompactionFileDeletedWhenShutdown() throws Exception {
         createTableDefault();
-        AppendOnlyTableCompactionWorkerOperator workerOperator =
-                new AppendOnlyTableCompactionWorkerOperator(getTableDefault(), "user");
+        UnawareDividedCompactionWorkerOperator workerOperator =
+                new UnawareDividedCompactionWorkerOperator(getTableDefault(), "user");
 
         // write 200 files
         List<CommitMessage> commitMessages = writeDataDefault(200, 40);
@@ -145,7 +145,7 @@ public class AppendOnlyTableCompactionWorkerOperatorTest extends TableTestBase {
         }
 
         // shut down worker operator
-        workerOperator.shutdown();
+        workerOperator.close();
 
         // wait the last runnable in thread pool to stop
         Thread.sleep(2_000);

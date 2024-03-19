@@ -19,15 +19,16 @@
 package org.apache.paimon.flink.action;
 
 import org.apache.paimon.CoreOptions;
+import org.apache.paimon.append.AppendOnlyCompactionTask;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkConnectorOptions;
 import org.apache.paimon.flink.compact.UnawareBucketCompactionTopoBuilder;
 import org.apache.paimon.flink.sink.BucketsRowChannelComputer;
+import org.apache.paimon.flink.sink.CombinedTableCompactorSink;
 import org.apache.paimon.flink.sink.CompactorSinkBuilder;
-import org.apache.paimon.flink.sink.MultiTablesCompactorSink;
+import org.apache.paimon.flink.source.CombinedTableCompactorSourceBuilder;
 import org.apache.paimon.flink.source.CompactorSourceBuilder;
-import org.apache.paimon.flink.source.MultiTablesCompactorSourceBuilder;
 import org.apache.paimon.flink.utils.StreamExecutionEnvironmentUtils;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.FileStoreTable;
@@ -189,23 +190,34 @@ public class CompactDatabaseAction extends ActionBase {
         ReadableConfig conf = StreamExecutionEnvironmentUtils.getConfiguration(env);
         boolean isStreaming =
                 conf.get(ExecutionOptions.RUNTIME_MODE) == RuntimeExecutionMode.STREAMING;
-        // TODO: Currently, multi-tables compaction don't support tables which bucketmode is UNWARE.
-        MultiTablesCompactorSourceBuilder sourceBuilder =
-                new MultiTablesCompactorSourceBuilder(
+        CombinedTableCompactorSourceBuilder sourceBuilder =
+                new CombinedTableCompactorSourceBuilder(
                         catalogLoader(),
                         databasePattern,
                         includingPattern,
                         excludingPattern,
                         tableOptions.get(CoreOptions.CONTINUOUS_DISCOVERY_INTERVAL).toMillis());
-        DataStream<RowData> source =
-                sourceBuilder.withEnv(env).withContinuousMode(isStreaming).build();
 
-        DataStream<RowData> partitioned =
+        // multi bucket table which has multi bucket in a partition like fix bucket and dynamic
+        // bucket
+        DataStream<RowData> multiBucketTableSource =
                 partition(
-                        source,
+                        sourceBuilder
+                                .withEnv(env)
+                                .withContinuousMode(isStreaming)
+                                .buildForMultiBucketTableSource(),
                         new BucketsRowChannelComputer(),
                         tableOptions.get(FlinkConnectorOptions.SINK_PARALLELISM));
-        new MultiTablesCompactorSink(catalogLoader(), tableOptions).sinkFrom(partitioned);
+
+        // unaware bucket table
+        DataStream<AppendOnlyCompactionTask> unawareBucketTableSource =
+                sourceBuilder
+                        .withEnv(env)
+                        .withContinuousMode(isStreaming)
+                        .buildForUnawareBucketsTableSource();
+
+        new CombinedTableCompactorSink(catalogLoader(), tableOptions)
+                .sinkFrom(multiBucketTableSource, unawareBucketTableSource);
     }
 
     private void buildForTraditionalCompaction(

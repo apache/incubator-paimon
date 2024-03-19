@@ -19,39 +19,32 @@
 package org.apache.paimon.flink.source.operator;
 
 import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.catalog.Identifier;
+import org.apache.paimon.flink.compact.AbstractBucketScanLogic;
+import org.apache.paimon.flink.compact.MultiBucketScanLogic;
+import org.apache.paimon.flink.compact.StreamingFileScanner;
 import org.apache.paimon.flink.utils.JavaTypeInfo;
 import org.apache.paimon.table.source.DataSplit;
-import org.apache.paimon.table.source.EndOfScanException;
 import org.apache.paimon.table.source.Split;
-import org.apache.paimon.table.source.StreamTableScan;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.StreamSource;
 import org.apache.flink.table.data.RowData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
-/** It is responsible for monitoring compactor source in batch mode. */
-public class MultiTablesBatchCompactorSourceFunction extends MultiTablesCompactorSourceFunction {
+/** It is responsible for monitoring compactor source of multi bucket table in stream mode. */
+public class StreamingMultiSourceFunction
+        extends CombineModeCompactorSourceFunction<Tuple2<Split, String>> {
 
-    private static final Logger LOG =
-            LoggerFactory.getLogger(MultiTablesBatchCompactorSourceFunction.class);
-
-    public MultiTablesBatchCompactorSourceFunction(
+    public StreamingMultiSourceFunction(
             Catalog.Loader catalogLoader,
             Pattern includingPattern,
             Pattern excludingPattern,
@@ -62,44 +55,24 @@ public class MultiTablesBatchCompactorSourceFunction extends MultiTablesCompacto
                 includingPattern,
                 excludingPattern,
                 databasePattern,
-                false,
+                true,
                 monitorInterval);
     }
 
     @Override
-    public void run(SourceContext<Tuple2<Split, String>> ctx) throws Exception {
-        this.ctx = ctx;
-        if (isRunning) {
-            boolean isEmpty;
-            synchronized (ctx.getCheckpointLock()) {
-                if (!isRunning) {
-                    return;
-                }
-                try {
-                    // batch mode do not need check for new tables
-                    List<Tuple2<Split, String>> splits = new ArrayList<>();
-                    for (Map.Entry<Identifier, StreamTableScan> entry : scansMap.entrySet()) {
-                        Identifier identifier = entry.getKey();
-                        StreamTableScan scan = entry.getValue();
-                        splits.addAll(
-                                scan.plan().splits().stream()
-                                        .map(split -> new Tuple2<>(split, identifier.getFullName()))
-                                        .collect(Collectors.toList()));
-                    }
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
 
-                    isEmpty = splits.isEmpty();
-                    splits.forEach(ctx::collect);
-
-                } catch (EndOfScanException esf) {
-                    LOG.info("Catching EndOfStreamException, the stream is finished.");
-                    return;
-                }
-            }
-            if (isEmpty) {
-                throw new Exception(
-                        "No splits were collected. Please ensure there are tables detected after pattern matching");
-            }
-        }
+        AbstractBucketScanLogic<Tuple2<Split, String>> multiBucketTableScanLogic =
+                new MultiBucketScanLogic(
+                        catalogLoader,
+                        includingPattern,
+                        excludingPattern,
+                        databasePattern,
+                        isStreaming,
+                        isRunning);
+        this.compactionFileScanner =
+                new StreamingFileScanner<>(monitorInterval, multiBucketTableScanLogic, isRunning);
     }
 
     public static DataStream<RowData> buildSource(
@@ -111,23 +84,30 @@ public class MultiTablesBatchCompactorSourceFunction extends MultiTablesCompacto
             Pattern excludingPattern,
             Pattern databasePattern,
             long monitorInterval) {
-        MultiTablesBatchCompactorSourceFunction function =
-                new MultiTablesBatchCompactorSourceFunction(
+
+        StreamingMultiSourceFunction function =
+                new StreamingMultiSourceFunction(
                         catalogLoader,
                         includingPattern,
                         excludingPattern,
                         databasePattern,
                         monitorInterval);
         StreamSource<Tuple2<Split, String>, ?> sourceOperator = new StreamSource<>(function);
+        boolean isParallel = false;
         TupleTypeInfo<Tuple2<Split, String>> tupleTypeInfo =
                 new TupleTypeInfo<>(
                         new JavaTypeInfo<>(Split.class), BasicTypeInfo.STRING_TYPE_INFO);
         return new DataStreamSource<>(
-                        env, tupleTypeInfo, sourceOperator, false, name, Boundedness.BOUNDED)
+                        env,
+                        tupleTypeInfo,
+                        sourceOperator,
+                        isParallel,
+                        name,
+                        Boundedness.CONTINUOUS_UNBOUNDED)
                 .forceNonParallel()
                 .partitionCustom(
                         (key, numPartitions) -> key % numPartitions,
                         split -> ((DataSplit) split.f0).bucket())
-                .transform(name, typeInfo, new MultiTablesReadOperator(catalogLoader, false));
+                .transform(name, typeInfo, new MultiTablesReadOperator(catalogLoader, true));
     }
 }
