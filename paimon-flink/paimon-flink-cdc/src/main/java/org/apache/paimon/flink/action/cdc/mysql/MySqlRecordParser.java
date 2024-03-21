@@ -101,6 +101,7 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
     // NOTE: current table name is not converted by tableNameConverter
     private String currentTable;
     private String databaseName;
+    private String compositePrimaryKey;
     private final CdcMetadataConverter[] metadataConverters;
 
     private final Set<String> nonPkTables = new HashSet<>();
@@ -110,11 +111,13 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
             boolean caseSensitive,
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
-            CdcMetadataConverter[] metadataConverters) {
+            CdcMetadataConverter[] metadataConverters,
+            String compositePrimaryKey) {
         this.caseSensitive = caseSensitive;
         this.computedColumns = computedColumns;
         this.typeMapping = typeMapping;
         this.metadataConverters = metadataConverters;
+        this.compositePrimaryKey = compositePrimaryKey;
         objectMapper
                 .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -258,6 +261,9 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
 
             String className = field.getValue().name();
             String oldValue = objectValue.asText();
+            if (fieldName.equals(compositePrimaryKey)) {
+                oldValue = String.format("%s_%s_%s", databaseName, currentTable, oldValue);
+            }
             String newValue = oldValue;
 
             if (Bits.LOGICAL_NAME.equals(className)) {

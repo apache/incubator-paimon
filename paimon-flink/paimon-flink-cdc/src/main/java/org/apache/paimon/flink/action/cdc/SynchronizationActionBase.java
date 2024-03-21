@@ -62,6 +62,7 @@ public abstract class SynchronizationActionBase extends ActionBase {
     protected Map<String, String> tableConfig = new HashMap<>();
     protected TypeMapping typeMapping = TypeMapping.defaultMapping();
     protected CdcMetadataConverter[] metadataConverters = new CdcMetadataConverter[] {};
+    protected String compositePrimaryKey;
 
     public SynchronizationActionBase(
             String warehouse,
@@ -93,6 +94,11 @@ public abstract class SynchronizationActionBase extends ActionBase {
                 metadataColumns.stream()
                         .map(this.syncJobHandler::provideMetadataConverter)
                         .toArray(CdcMetadataConverter[]::new);
+        return this;
+    }
+
+    public SynchronizationActionBase withCompositePrimaryKey(String compositePrimaryKey) {
+        this.compositePrimaryKey = compositePrimaryKey;
         return this;
     }
 

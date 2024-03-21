@@ -65,6 +65,7 @@ public class CdcActionCommonUtils {
     public static final String PRIMARY_KEYS = "primary_keys";
     public static final String COMPUTED_COLUMN = "computed_column";
     public static final String METADATA_COLUMN = "metadata_column";
+    public static final String COMPOSITE_PRIMARY_KEY = "composite_primary_key";
 
     public static void assertSchemaCompatible(
             TableSchema paimonSchema, List<DataField> sourceTableFields) {

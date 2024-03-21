@@ -96,19 +96,22 @@ public class PostgresRecordParser implements FlatMapFunction<String, RichCdcMult
     // NOTE: current table name is not converted by tableNameConverter
     private String currentTable;
     private String databaseName;
+    private String compositePrimaryKey;
     private final CdcMetadataConverter[] metadataConverters;
 
     public PostgresRecordParser(
             Configuration postgresConfig,
             boolean caseSensitive,
             TypeMapping typeMapping,
-            CdcMetadataConverter[] metadataConverters) {
+            CdcMetadataConverter[] metadataConverters,
+            String compositePrimaryKey) {
         this(
                 postgresConfig,
                 caseSensitive,
                 Collections.emptyList(),
                 typeMapping,
-                metadataConverters);
+                metadataConverters,
+                compositePrimaryKey);
     }
 
     public PostgresRecordParser(
@@ -116,11 +119,13 @@ public class PostgresRecordParser implements FlatMapFunction<String, RichCdcMult
             boolean caseSensitive,
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
-            CdcMetadataConverter[] metadataConverters) {
+            CdcMetadataConverter[] metadataConverters,
+            String compositePrimaryKey) {
         this.caseSensitive = caseSensitive;
         this.computedColumns = computedColumns;
         this.typeMapping = typeMapping;
         this.metadataConverters = metadataConverters;
+        this.compositePrimaryKey = compositePrimaryKey;
         objectMapper
                 .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -158,7 +163,10 @@ public class PostgresRecordParser implements FlatMapFunction<String, RichCdcMult
                             columnCaseConvertAndDuplicateCheck(
                                     key, existedFields, caseSensitive, columnDuplicateErrMsg);
 
-                    DataType dataType = extractFieldType(value);
+                    DataType dataType =
+                            columnName.equals(compositePrimaryKey)
+                                    ? DataTypes.STRING()
+                                    : extractFieldType(value);
                     dataType =
                             dataType.copy(
                                     typeMapping.containsMode(TO_NULLABLE) || value.optional());
@@ -281,6 +289,9 @@ public class PostgresRecordParser implements FlatMapFunction<String, RichCdcMult
 
             String className = field.getValue().name();
             String oldValue = objectValue.asText();
+            if (fieldName.equals(compositePrimaryKey)) {
+                oldValue = String.format("%s_%s_%s", databaseName, currentTable, oldValue);
+            }
             String newValue = oldValue;
 
             if (Bits.LOGICAL_NAME.equals(className)) {

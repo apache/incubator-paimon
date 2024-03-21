@@ -196,7 +196,8 @@ public class SyncJobHandler {
             boolean caseSensitive,
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
-            CdcMetadataConverter[] metadataConverters) {
+            CdcMetadataConverter[] metadataConverters,
+            String compositePrimaryKey) {
         switch (sourceType) {
             case MYSQL:
                 return new MySqlRecordParser(
@@ -204,14 +205,16 @@ public class SyncJobHandler {
                         caseSensitive,
                         computedColumns,
                         typeMapping,
-                        metadataConverters);
+                        metadataConverters,
+                        compositePrimaryKey);
             case POSTGRES:
                 return new PostgresRecordParser(
                         cdcSourceConfig,
                         caseSensitive,
                         computedColumns,
                         typeMapping,
-                        metadataConverters);
+                        metadataConverters,
+                        compositePrimaryKey);
             case KAFKA:
             case PULSAR:
                 DataFormat dataFormat = provideDataFormat();
