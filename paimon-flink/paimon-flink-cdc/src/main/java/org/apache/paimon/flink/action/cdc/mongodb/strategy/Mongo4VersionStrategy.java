@@ -21,8 +21,10 @@ package org.apache.paimon.flink.action.cdc.mongodb.strategy;
 import org.apache.paimon.flink.action.cdc.ComputedColumn;
 import org.apache.paimon.flink.sink.cdc.CdcRecord;
 import org.apache.paimon.flink.sink.cdc.RichCdcMultiplexRecord;
+import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.RowKind;
+import org.apache.paimon.types.RowType;
 
 import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.databind.JsonNode;
@@ -34,9 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.columnDuplicateErrMsg;
-import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.mapKeyCaseConvert;
-import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.recordKeyDuplicateErrMsg;
+import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.*;
 
 /**
  * Implementation class for extracting records from MongoDB versions greater than 4.x and less than
@@ -131,18 +131,20 @@ public class Mongo4VersionStrategy implements MongoVersionStrategy {
     private RichCdcMultiplexRecord processRecord(JsonNode fullDocument, RowKind rowKind)
             throws JsonProcessingException {
         LinkedHashMap<String, DataType> paimonFieldTypes = new LinkedHashMap<>();
+        RowType.Builder rowTypeBuilder = RowType.builder();
+
         Map<String, String> record =
-                getExtractRow(fullDocument, paimonFieldTypes, computedColumns, mongodbConfig);
+                getExtractRow(fullDocument, rowTypeBuilder, computedColumns, mongodbConfig);
 
         record = mapKeyCaseConvert(record, caseSensitive, recordKeyDuplicateErrMsg(record));
-        paimonFieldTypes =
-                mapKeyCaseConvert(
-                        paimonFieldTypes, caseSensitive, columnDuplicateErrMsg(collection));
+
+        List<DataField> fields = rowTypeBuilder.build().getFields();
+        fields = fieldNameCaseConvert(fields, caseSensitive, collection);
 
         return new RichCdcMultiplexRecord(
                 databaseName,
                 collection,
-                paimonFieldTypes,
+                fields,
                 extractPrimaryKeys(),
                 new CdcRecord(rowKind, record));
     }
