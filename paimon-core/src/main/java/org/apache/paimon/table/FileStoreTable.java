@@ -97,6 +97,9 @@ public interface FileStoreTable extends DataTable {
 
     TableWriteImpl<?> newWrite(String commitUser, ManifestCacheFilter manifestFilter);
 
+    TableWriteImpl<?> newWrite(
+            String commitUser, ManifestCacheFilter manifestFilter, String branchName);
+
     @Override
     TableCommitImpl newCommit(String commitUser);
 
