@@ -206,7 +206,7 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
                             typeMapping);
             dataType = dataType.copy(typeMapping.containsMode(TO_NULLABLE) || column.isOptional());
 
-            rowType.field(columnName, dataType, column.comment());
+            rowType.field(columnName, dataType);
         }
         return rowType.build().getFields();
     }
