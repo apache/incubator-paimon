@@ -22,7 +22,6 @@ import org.apache.paimon.flink.action.cdc.ComputedColumn;
 import org.apache.paimon.flink.sink.cdc.CdcRecord;
 import org.apache.paimon.flink.sink.cdc.RichCdcMultiplexRecord;
 import org.apache.paimon.types.DataField;
-import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
 
@@ -32,11 +31,12 @@ import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.*;
+import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.fieldNameCaseConvert;
+import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.mapKeyCaseConvert;
+import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.recordKeyDuplicateErrMsg;
 
 /**
  * Implementation class for extracting records from MongoDB versions greater than 4.x and less than
@@ -130,7 +130,6 @@ public class Mongo4VersionStrategy implements MongoVersionStrategy {
      */
     private RichCdcMultiplexRecord processRecord(JsonNode fullDocument, RowKind rowKind)
             throws JsonProcessingException {
-        LinkedHashMap<String, DataType> paimonFieldTypes = new LinkedHashMap<>();
         RowType.Builder rowTypeBuilder = RowType.builder();
 
         Map<String, String> record =

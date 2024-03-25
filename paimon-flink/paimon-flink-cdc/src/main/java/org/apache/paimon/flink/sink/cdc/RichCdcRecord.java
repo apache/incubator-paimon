@@ -26,7 +26,11 @@ import org.apache.paimon.types.RowKind;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** A change message contains schema and data. */
