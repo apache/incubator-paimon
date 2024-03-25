@@ -24,8 +24,10 @@ import org.apache.paimon.flink.action.cdc.TypeMapping;
 import org.apache.paimon.flink.action.cdc.mysql.format.DebeziumEvent;
 import org.apache.paimon.flink.sink.cdc.CdcRecord;
 import org.apache.paimon.flink.sink.cdc.RichCdcMultiplexRecord;
+import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.RowKind;
+import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.DateTimeUtils;
 import org.apache.paimon.utils.JsonSerdeUtil;
 import org.apache.paimon.utils.Preconditions;
@@ -174,22 +176,19 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
 
         Table table = tableChange.getTable();
 
-        LinkedHashMap<String, DataType> fieldTypes = extractFieldTypes(table);
+        List<DataField> fields = extractFieldTypes(table);
         List<String> primaryKeys = listCaseConvert(table.primaryKeyColumnNames(), caseSensitive);
 
         // TODO : add table comment and column comment when we upgrade flink cdc to 2.4
         return Collections.singletonList(
                 new RichCdcMultiplexRecord(
-                        databaseName,
-                        currentTable,
-                        fieldTypes,
-                        primaryKeys,
-                        CdcRecord.emptyRecord()));
+                        databaseName, currentTable, fields, primaryKeys, CdcRecord.emptyRecord()));
     }
 
-    private LinkedHashMap<String, DataType> extractFieldTypes(Table table) {
+    private List<DataField> extractFieldTypes(Table table) {
         List<Column> columns = table.columns();
-        LinkedHashMap<String, DataType> fieldTypes = new LinkedHashMap<>(columns.size());
+
+        RowType.Builder rowType = RowType.builder();
         Set<String> existedFields = new HashSet<>();
         Function<String, String> columnDuplicateErrMsg =
                 columnDuplicateErrMsg(table.id().toString());
@@ -207,9 +206,9 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
                             typeMapping);
             dataType = dataType.copy(typeMapping.containsMode(TO_NULLABLE) || column.isOptional());
 
-            fieldTypes.put(columnName, dataType);
+            rowType.field(columnName, dataType);
         }
-        return fieldTypes;
+        return rowType.build().getFields();
     }
 
     private List<RichCdcMultiplexRecord> extractRecords() {
@@ -380,7 +379,7 @@ public class MySqlRecordParser implements FlatMapFunction<String, RichCdcMultipl
         return new RichCdcMultiplexRecord(
                 databaseName,
                 currentTable,
-                new LinkedHashMap<>(0),
+                Collections.emptyList(),
                 Collections.emptyList(),
                 new CdcRecord(rowKind, data));
     }
