@@ -217,7 +217,8 @@ public class JdbcCatalog extends AbstractCatalog {
     }
 
     @Override
-    protected void dropTableImpl(Identifier identifier) {
+    protected void dropTableImpl(Identifier identifier, boolean ifPurge) {
+        //fixme purge for jdbc is not implemented
         try {
             int deletedRecords =
                     execute(
