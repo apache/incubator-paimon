@@ -36,6 +36,7 @@ public class JdbcCatalogLock implements CatalogLock {
     private final long checkMaxSleep;
     private final long acquireTimeout;
     private final String catalogKey;
+    private final boolean closeConnectionsUsed;
 
     public JdbcCatalogLock(
             JdbcClientPool connections,
@@ -46,6 +47,20 @@ public class JdbcCatalogLock implements CatalogLock {
         this.checkMaxSleep = checkMaxSleep;
         this.acquireTimeout = acquireTimeout;
         this.catalogKey = catalogKey;
+        this.closeConnectionsUsed = false;
+    }
+
+    public JdbcCatalogLock(
+            JdbcClientPool connections,
+            String catalogKey,
+            long checkMaxSleep,
+            long acquireTimeout,
+            boolean closeConnectionsUsed) {
+        this.connections = connections;
+        this.checkMaxSleep = checkMaxSleep;
+        this.acquireTimeout = acquireTimeout;
+        this.catalogKey = catalogKey;
+        this.closeConnectionsUsed = closeConnectionsUsed;
     }
 
     @Override
@@ -83,7 +98,9 @@ public class JdbcCatalogLock implements CatalogLock {
 
     @Override
     public void close() throws IOException {
-        // Do nothing
+        if (closeConnectionsUsed) {
+            connections.close();
+        }
     }
 
     public static long checkMaxSleep(Map<String, String> conf) {

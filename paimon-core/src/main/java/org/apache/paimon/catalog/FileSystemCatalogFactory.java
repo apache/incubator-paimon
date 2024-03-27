@@ -22,6 +22,8 @@ import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.table.TableType;
 
+import static org.apache.paimon.options.CatalogOptions.LOCK_ENABLED;
+import static org.apache.paimon.options.CatalogOptions.LOCK_TYPE;
 import static org.apache.paimon.options.CatalogOptions.TABLE_TYPE;
 
 /** Factory to create {@link FileSystemCatalog}. */
@@ -39,6 +41,9 @@ public class FileSystemCatalogFactory implements CatalogFactory {
         if (!TableType.MANAGED.equals(context.options().get(TABLE_TYPE))) {
             throw new IllegalArgumentException(
                     "Only managed table is supported in File system catalog.");
+        }
+        if (context.options().get(LOCK_ENABLED) && context.options().get(LOCK_TYPE) == null) {
+            throw new IllegalArgumentException("Please configure the lock type correctly.");
         }
         return new FileSystemCatalog(fileIO, warehouse, context.options());
     }
