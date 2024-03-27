@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static org.apache.paimon.utils.BranchManager.DEFAULT_MAIN_BRANCH;
 import static org.apache.paimon.utils.BranchManager.getBranchPath;
 import static org.apache.paimon.utils.FileUtils.listVersionedFileStatus;
 import static org.apache.paimon.utils.Preconditions.checkArgument;
@@ -61,7 +62,11 @@ public class TagManager {
 
     /** Return the root Directory of tags. */
     public Path tagDirectory() {
-        return new Path(tablePath + "/tag");
+        return tagDirectory(DEFAULT_MAIN_BRANCH);
+    }
+
+    public Path tagDirectory(String branchName) {
+        return new Path(getBranchPath(fileIO, tablePath, branchName) + "/tag");
     }
 
     /** Return the path of a tag. */
@@ -70,8 +75,9 @@ public class TagManager {
     }
 
     /** Return the path of a tag in branch. */
-    public Path branchTagPath(String branchName, String tagName) {
-        return new Path(getBranchPath(tablePath, branchName) + "/tag/" + TAG_PREFIX + tagName);
+    public Path tagPath(String branchName, String tagName) {
+        return new Path(
+                getBranchPath(fileIO, tablePath, branchName) + "/tag/" + TAG_PREFIX + tagName);
     }
 
     /** Create a tag from given snapshot and save it in the storage. */

@@ -45,6 +45,7 @@ public class BranchManager {
 
     public static final String BRANCH_PREFIX = "branch-";
     public static final String DEFAULT_MAIN_BRANCH = "main";
+    public static final String MAIN_BRANCH_FILE = "MAIN-BRANCH";
 
     private final FileIO fileIO;
     private final Path tablePath;
@@ -71,13 +72,69 @@ public class BranchManager {
     }
 
     /** Return the path string of a branch. */
-    public static String getBranchPath(Path tablePath, String branchName) {
+    public static String getBranchPath(FileIO fileIO, Path tablePath, String branchName) {
+        if (branchName.equals(DEFAULT_MAIN_BRANCH)) {
+            Path path = new Path(tablePath, MAIN_BRANCH_FILE);
+            try {
+                if (fileIO.exists(path)) {
+                    String data = fileIO.readFileUtf8(path);
+                    if (StringUtils.isBlank(data)) {
+                        return tablePath.toString();
+                    } else {
+                        return tablePath.toString() + "/branch/" + BRANCH_PREFIX + data;
+                    }
+                } else {
+                    return tablePath.toString();
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
         return tablePath.toString() + "/branch/" + BRANCH_PREFIX + branchName;
+    }
+
+    /** Get main branch. */
+    public String mainBranch() {
+        Path path = new Path(tablePath, MAIN_BRANCH_FILE);
+        try {
+            if (fileIO.exists(path)) {
+                return fileIO.readFileUtf8(path);
+            } else {
+                return DEFAULT_MAIN_BRANCH;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /** Return the path of a branch. */
     public Path branchPath(String branchName) {
-        return new Path(getBranchPath(tablePath, branchName));
+        return new Path(getBranchPath(fileIO, tablePath, branchName));
+    }
+
+    /** Replace main by specify branch. */
+    public void commitMainBranch(String branchName) {
+        Path mainBranchFile = new Path(tablePath, MAIN_BRANCH_FILE);
+        try {
+            fileIO.delete(mainBranchFile, false);
+            fileIO.overwriteFileUtf8(mainBranchFile, branchName);
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    String.format(
+                            "Exception occurs when set main branch '%s' (directory in %s).",
+                            branchName, tablePath.toString()),
+                    e);
+        }
+    }
+
+    /** Clean the main branch file and use default. */
+    public void cleanMainBranchFile() {
+        Path mainBranchFile = new Path(tablePath, MAIN_BRANCH_FILE);
+        try {
+            fileIO.delete(mainBranchFile, false);
+        } catch (IOException e) {
+            throw new RuntimeException("Exception occurs when clean main branch file.", e);
+        }
     }
 
     public void createBranch(String branchName, String tagName) {
@@ -99,18 +156,18 @@ public class BranchManager {
         try {
             // Copy the corresponding tag, snapshot and schema files into the branch directory
             fileIO.copyFileUtf8(
-                    tagManager.tagPath(tagName), tagManager.branchTagPath(branchName, tagName));
+                    tagManager.tagPath(tagName), tagManager.tagPath(branchName, tagName));
             fileIO.copyFileUtf8(
                     snapshotManager.snapshotPath(snapshot.id()),
                     snapshotManager.branchSnapshotPath(branchName, snapshot.id()));
             fileIO.copyFileUtf8(
                     schemaManager.toSchemaPath(snapshot.schemaId()),
-                    schemaManager.branchSchemaPath(branchName, snapshot.schemaId()));
+                    schemaManager.toSchemaPath(branchName, snapshot.schemaId()));
         } catch (IOException e) {
             throw new RuntimeException(
                     String.format(
                             "Exception occurs when create branch '%s' (directory in %s).",
-                            branchName, getBranchPath(tablePath, branchName)),
+                            branchName, getBranchPath(fileIO, tablePath, branchName)),
                     e);
         }
     }
@@ -124,7 +181,7 @@ public class BranchManager {
             LOG.info(
                     String.format(
                             "Deleting the branch failed due to an exception in deleting the directory %s. Please try again.",
-                            getBranchPath(tablePath, branchName)),
+                            getBranchPath(fileIO, tablePath, branchName)),
                     e);
         }
     }
@@ -169,7 +226,7 @@ public class BranchManager {
                 String branchName = path.getLeft().getName().substring(BRANCH_PREFIX.length());
                 FileStoreTable branchTable =
                         FileStoreTableFactory.create(
-                                fileIO, new Path(getBranchPath(tablePath, branchName)));
+                                fileIO, new Path(getBranchPath(fileIO, tablePath, branchName)));
                 SortedMap<Snapshot, List<String>> snapshotTags = branchTable.tagManager().tags();
                 checkArgument(!snapshotTags.isEmpty());
                 Snapshot snapshot = snapshotTags.firstKey();

@@ -150,6 +150,30 @@ public interface ReadonlyTable extends InnerTable {
     }
 
     @Override
+    default void mainBranch() {
+        throw new UnsupportedOperationException(
+                String.format(
+                        "Readonly Table %s does not support mainBranch.",
+                        this.getClass().getSimpleName()));
+    }
+
+    @Override
+    default void cleanMainBranchFile() {
+        throw new UnsupportedOperationException(
+                String.format(
+                        "Readonly Table %s does not support cleanMainBranchFile.",
+                        this.getClass().getSimpleName()));
+    }
+
+    @Override
+    default void replaceMainBranch(String branchName) {
+        throw new UnsupportedOperationException(
+                String.format(
+                        "Readonly Table %s does not support setMainBranch.",
+                        this.getClass().getSimpleName()));
+    }
+
+    @Override
     default ExpireSnapshots newExpireSnapshots() {
         throw new UnsupportedOperationException(
                 String.format(
