@@ -52,7 +52,7 @@ public class ByteArraySeekableStreamTest {
         }
 
         for (int i = 0; i < RANDOM.nextInt(1000); i++) {
-            int position = RANDOM.nextInt(bl);
+            int position = RANDOM.nextInt(bl - 100);
             byteArraySeekableStream.seek(position);
             for (int j = 0; j < 100; j++) {
                 Assertions.assertThat(b[position + j])
