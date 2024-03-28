@@ -71,7 +71,7 @@ public abstract class FileStoreExpireTestBase {
     private TestFileStore createStore() {
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        CoreOptions.ChangelogProducer changelogProducer = CoreOptions.ChangelogProducer.NONE;
+        CoreOptions.ChangelogProducer changelogProducer;
         if (random.nextBoolean()) {
             changelogProducer = CoreOptions.ChangelogProducer.INPUT;
         } else {
