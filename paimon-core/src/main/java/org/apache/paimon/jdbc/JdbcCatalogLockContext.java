@@ -19,19 +19,29 @@
 package org.apache.paimon.jdbc;
 
 import org.apache.paimon.catalog.CatalogLockContext;
+import org.apache.paimon.options.CatalogOptions;
 import org.apache.paimon.options.Options;
+
+import java.sql.SQLException;
 
 /** Jdbc lock context. */
 public class JdbcCatalogLockContext implements CatalogLockContext {
 
-    private final JdbcClientPool connections;
+    private JdbcClientPool connections;
+    private final boolean closeConnectionsUsed;
     private final String catalogKey;
     private final Options options;
 
-    public JdbcCatalogLockContext(JdbcClientPool connections, String catalogKey, Options options) {
-        this.connections = connections;
-        this.catalogKey = catalogKey;
+    public JdbcCatalogLockContext(Options options, boolean closeConnectionsUsed) {
         this.options = options;
+        this.catalogKey = options.get(JdbcCatalogOptions.CATALOG_KEY);
+        this.closeConnectionsUsed = closeConnectionsUsed;
+    }
+
+    JdbcCatalogLockContext(
+            JdbcClientPool connections, Options options, boolean closeConnectionsUsed) {
+        this(options, closeConnectionsUsed);
+        this.connections = connections;
     }
 
     @Override
@@ -39,11 +49,29 @@ public class JdbcCatalogLockContext implements CatalogLockContext {
         return options;
     }
 
-    public JdbcClientPool connections() {
-        return connections;
-    }
-
     public String catalogKey() {
         return catalogKey;
+    }
+
+    public boolean isCloseConnectionsUsed() {
+        return closeConnectionsUsed;
+    }
+
+    public JdbcClientPool clientPool() {
+        if (this.connections == null) {
+            this.connections =
+                    new JdbcClientPool(
+                            options.get(CatalogOptions.CLIENT_POOL_SIZE),
+                            options.get(CatalogOptions.URI.key()),
+                            options.toMap());
+            try {
+                JdbcUtils.createDistributedLockTable(connections, options);
+            } catch (SQLException e) {
+                throw new RuntimeException("Cannot initialize JDBC distributed lock.", e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Interrupted in call to initialize", e);
+            }
+        }
+        return connections;
     }
 }

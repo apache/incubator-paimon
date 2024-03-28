@@ -44,9 +44,10 @@ public class JdbcCatalogLockFactory implements CatalogLockFactory {
         JdbcCatalogLockContext lockContext = (JdbcCatalogLockContext) context;
         Map<String, String> optionsMap = lockContext.options().toMap();
         return new JdbcCatalogLock(
-                lockContext.connections(),
+                lockContext.clientPool(),
                 lockContext.catalogKey(),
                 checkMaxSleep(optionsMap),
-                acquireTimeout(optionsMap));
+                acquireTimeout(optionsMap),
+                lockContext.isCloseConnectionsUsed());
     }
 }
