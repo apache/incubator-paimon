@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static org.apache.paimon.utils.BranchManager.DEFAULT_MAIN_BRANCH;
 import static org.apache.paimon.utils.BranchManager.getBranchPath;
 import static org.apache.paimon.utils.FileUtils.listVersionedFileStatus;
 import static org.apache.paimon.utils.Preconditions.checkArgument;
@@ -61,17 +62,22 @@ public class TagManager {
 
     /** Return the root Directory of tags. */
     public Path tagDirectory() {
-        return new Path(tablePath + "/tag");
+        return tagDirectory(DEFAULT_MAIN_BRANCH);
+    }
+
+    public Path tagDirectory(String branchName) {
+        return new Path(getBranchPath(fileIO, tablePath, branchName) + "/tag");
     }
 
     /** Return the path of a tag. */
     public Path tagPath(String tagName) {
-        return new Path(tablePath + "/tag/" + TAG_PREFIX + tagName);
+        return tagPath(DEFAULT_MAIN_BRANCH, tagName);
     }
 
     /** Return the path of a tag in branch. */
-    public Path branchTagPath(String branchName, String tagName) {
-        return new Path(getBranchPath(tablePath, branchName) + "/tag/" + TAG_PREFIX + tagName);
+    public Path tagPath(String branchName, String tagName) {
+        return new Path(
+                getBranchPath(fileIO, tablePath, branchName) + "/tag/" + TAG_PREFIX + tagName);
     }
 
     /** Create a tag from given snapshot and save it in the storage. */
@@ -211,6 +217,19 @@ public class TagManager {
                 taggedSnapshot, tagDeletion.manifestSkippingSet(skippedSnapshots));
     }
 
+    /** Check if a tag exists in branch. */
+    public boolean tagExists(String branchName, String tagName) {
+        Path path = tagPath(branchName, tagName);
+        try {
+            return fileIO.exists(path);
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    String.format(
+                            "Failed to determine if tag '%s' exists in path %s.", tagName, path),
+                    e);
+        }
+    }
+
     /** Check if a tag exists. */
     public boolean tagExists(String tagName) {
         Path path = tagPath(tagName);
@@ -260,11 +279,19 @@ public class TagManager {
      * @throws RuntimeException if an IOException occurs during retrieval of snapshots.
      */
     public SortedMap<Snapshot, List<String>> tags(Predicate<String> filter) {
+        return tagsWithBranch(filter, null);
+    }
+
+    public SortedMap<Snapshot, List<String>> tagsWithBranch(
+            Predicate<String> filter, String branchName) {
         TreeMap<Snapshot, List<String>> tags =
                 new TreeMap<>(Comparator.comparingLong(Snapshot::id));
         try {
+
+            Path tagDirectory =
+                    StringUtils.isBlank(branchName) ? tagDirectory() : tagDirectory(branchName);
             List<Path> paths =
-                    listVersionedFileStatus(fileIO, tagDirectory(), TAG_PREFIX)
+                    listVersionedFileStatus(fileIO, tagDirectory, TAG_PREFIX)
                             .map(FileStatus::getPath)
                             .collect(Collectors.toList());
 
