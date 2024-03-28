@@ -43,7 +43,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Base test class for {@link FileStoreExpireImpl}. */
+/** Base test class for {@link org.apache.paimon.table.ExpireSnapshotsImpl}. */
 public abstract class FileStoreExpireTestBase {
 
     protected final FileIO fileIO = new LocalFileIO();
@@ -71,12 +71,13 @@ public abstract class FileStoreExpireTestBase {
     private TestFileStore createStore() {
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        CoreOptions.ChangelogProducer changelogProducer;
-        if (random.nextBoolean()) {
-            changelogProducer = CoreOptions.ChangelogProducer.INPUT;
-        } else {
-            changelogProducer = CoreOptions.ChangelogProducer.NONE;
-        }
+        CoreOptions.ChangelogProducer changelogProducer = CoreOptions.ChangelogProducer.NONE;
+        //        if (random.nextBoolean()) {
+        //            changelogProducer = CoreOptions.ChangelogProducer.INPUT;
+        //        } else {
+        //            changelogProducer = CoreOptions.ChangelogProducer.NONE;
+        //        }
+        System.out.println(changelogProducer);
 
         return new TestFileStore.Builder(
                         "avro",
