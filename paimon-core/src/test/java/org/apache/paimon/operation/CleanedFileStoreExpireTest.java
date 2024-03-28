@@ -32,7 +32,6 @@ import org.apache.paimon.utils.RecordWriter;
 import org.apache.paimon.utils.SnapshotManager;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -261,8 +260,7 @@ public class CleanedFileStoreExpireTest extends FileStoreExpireTestBase {
         FileStoreTestUtils.assertPathExists(fileIO, dataFilePath2);
     }
 
-    @RepeatedTest(10)
-    //    @Test
+    @Test
     public void testChangelogOutLivedSnapshot() throws Exception {
         List<KeyValue> allData = new ArrayList<>();
         List<Integer> snapshotPositions = new ArrayList<>();
