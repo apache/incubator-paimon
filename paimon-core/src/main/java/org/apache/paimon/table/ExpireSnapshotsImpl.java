@@ -18,6 +18,7 @@
 
 package org.apache.paimon.table;
 
+import org.apache.paimon.Changelog;
 import org.apache.paimon.Snapshot;
 import org.apache.paimon.annotation.VisibleForTesting;
 import org.apache.paimon.consumer.ConsumerManager;
@@ -45,6 +46,8 @@ public class ExpireSnapshotsImpl implements ExpireSnapshots {
     private final SnapshotDeletion snapshotDeletion;
     private final TagManager tagManager;
     private final boolean cleanEmptyDirectories;
+    /** Whether to clean the changelog or delta files. */
+    private final boolean changelogDecoupled;
 
     private int retainMax = Integer.MAX_VALUE;
     private int retainMin = 1;
@@ -55,13 +58,15 @@ public class ExpireSnapshotsImpl implements ExpireSnapshots {
             SnapshotManager snapshotManager,
             SnapshotDeletion snapshotDeletion,
             TagManager tagManager,
-            boolean cleanEmptyDirectories) {
+            boolean cleanEmptyDirectories,
+            boolean changelogDecoupled) {
         this.snapshotManager = snapshotManager;
         this.consumerManager =
                 new ConsumerManager(snapshotManager.fileIO(), snapshotManager.tablePath());
         this.snapshotDeletion = snapshotDeletion;
         this.tagManager = tagManager;
         this.cleanEmptyDirectories = cleanEmptyDirectories;
+        this.changelogDecoupled = changelogDecoupled;
     }
 
     @Override
@@ -187,13 +192,15 @@ public class ExpireSnapshotsImpl implements ExpireSnapshots {
         }
 
         // delete changelog files
-        for (long id = beginInclusiveId; id < endExclusiveId; id++) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Ready to delete changelog files from snapshot #" + id);
-            }
-            Snapshot snapshot = snapshotManager.snapshot(id);
-            if (snapshot.changelogManifestList() != null) {
-                snapshotDeletion.deleteAddedDataFiles(snapshot.changelogManifestList());
+        if (!changelogDecoupled) {
+            for (long id = beginInclusiveId; id < endExclusiveId; id++) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ready to delete changelog files from snapshot #" + id);
+                }
+                Snapshot snapshot = snapshotManager.snapshot(id);
+                if (snapshot.changelogManifestList() != null) {
+                    snapshotDeletion.deleteAddedDataFiles(snapshot.changelogManifestList());
+                }
             }
         }
 
@@ -215,9 +222,43 @@ public class ExpireSnapshotsImpl implements ExpireSnapshots {
             }
 
             Snapshot snapshot = snapshotManager.snapshot(id);
-            snapshotDeletion.cleanUnusedManifests(snapshot, skippingSet);
-
-            // delete snapshot last
+            if (changelogDecoupled) {
+                Changelog changelog;
+                if (snapshot.changelogManifestList() != null) {
+                    changelog =
+                            new Changelog(
+                                    id,
+                                    snapshot.schemaId(),
+                                    null,
+                                    snapshot.changelogManifestList(),
+                                    snapshot.commitKind(),
+                                    snapshot.timeMillis(),
+                                    snapshot.changelogRecordCount(),
+                                    snapshot.watermark());
+                    snapshotDeletion.cleanUnusedManifests(snapshot, skippingSet, false);
+                } else {
+                    // no changelog
+                    changelog =
+                            new Changelog(
+                                    id,
+                                    snapshot.schemaId(),
+                                    null,
+                                    null,
+                                    snapshot.commitKind(),
+                                    snapshot.timeMillis(),
+                                    0L,
+                                    snapshot.watermark());
+                    snapshotDeletion.cleanUnusedManifests(snapshot, skippingSet, true);
+                }
+                try {
+                    snapshotManager.commitChangelog(changelog, id);
+                    snapshotManager.commitLongLivedChangelogLatestHint(id);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            } else {
+                snapshotDeletion.cleanUnusedManifests(snapshot, skippingSet, true);
+            }
             snapshotManager.fileIO().deleteQuietly(snapshotManager.snapshotPath(id));
         }
 
