@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.sink;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.flink.VersionedSerializerWrapper;
 import org.apache.paimon.manifest.ManifestCommittable;
 import org.apache.paimon.manifest.ManifestCommittableSerializer;
@@ -48,7 +49,7 @@ public abstract class FlinkWriteSink<T> extends FlinkSink<T> {
         // a restart.
         return (user, metricGroup) ->
                 new StoreCommitter(
-                        table.newCommit(user)
+                        table.newCommit(user, CoreOptions.branch(table.options()))
                                 .withOverwrite(overwritePartition)
                                 .ignoreEmptyCommit(!streamingCheckpointEnabled),
                         metricGroup);

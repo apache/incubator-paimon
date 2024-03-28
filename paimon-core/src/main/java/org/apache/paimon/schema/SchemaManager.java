@@ -44,6 +44,7 @@ import org.apache.paimon.types.ReassignFieldId;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.JsonSerdeUtil;
 import org.apache.paimon.utils.Preconditions;
+import org.apache.paimon.utils.StringUtils;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -77,12 +78,18 @@ public class SchemaManager implements Serializable {
 
     private final FileIO fileIO;
     private final Path tableRoot;
-
     @Nullable private transient Lock lock;
+    private final String branch;
 
     public SchemaManager(FileIO fileIO, Path tableRoot) {
+        this(fileIO, tableRoot, DEFAULT_MAIN_BRANCH);
+    }
+
+    /** Specify the default branch for data writing. */
+    public SchemaManager(FileIO fileIO, Path tableRoot, String branch) {
         this.fileIO = fileIO;
         this.tableRoot = tableRoot;
+        this.branch = StringUtils.isBlank(branch) ? DEFAULT_MAIN_BRANCH : branch;
     }
 
     public SchemaManager withLock(@Nullable Lock lock) {
@@ -90,44 +97,53 @@ public class SchemaManager implements Serializable {
         return this;
     }
 
-    /** @return latest schema. */
     public Optional<TableSchema> latest() {
-        return latest(DEFAULT_MAIN_BRANCH);
+        return latest(branch);
     }
 
-    public Optional<TableSchema> latest(String branchName) {
-        Path directoryPath =
-                branchName.equals(DEFAULT_MAIN_BRANCH)
-                        ? schemaDirectory()
-                        : branchSchemaDirectory(branchName);
+    public Optional<TableSchema> latest(String branch) {
         try {
-            return listVersionedFiles(fileIO, directoryPath, SCHEMA_PREFIX)
+            return listVersionedFiles(fileIO, schemaDirectory(branch), SCHEMA_PREFIX)
                     .reduce(Math::max)
-                    .map(this::schema);
+                    .map(id -> schema(id, branch));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    /** List all schema. */
     public List<TableSchema> listAll() {
-        return listAllIds().stream().map(this::schema).collect(Collectors.toList());
+        return listAll(branch);
+    }
+
+    public List<TableSchema> listAll(String branch) {
+        return listAllIds(branch).stream()
+                .map(id -> schema(id, branch))
+                .collect(Collectors.toList());
+    }
+
+    public List<Long> listAllIds() {
+        return listAllIds(branch);
     }
 
     /** List all schema IDs. */
-    public List<Long> listAllIds() {
+    public List<Long> listAllIds(String branch) {
         try {
-            return listVersionedFiles(fileIO, schemaDirectory(), SCHEMA_PREFIX)
+            return listVersionedFiles(fileIO, schemaDirectory(branch), SCHEMA_PREFIX)
                     .collect(Collectors.toList());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    /** Create a new schema from {@link Schema}. */
     public TableSchema createTable(Schema schema) throws Exception {
+        return createTable(branch, schema);
+    }
+
+    /** Create a new schema from {@link Schema}. */
+    public TableSchema createTable(String branch, Schema schema) throws Exception {
         while (true) {
-            latest().ifPresent(
+            latest(branch)
+                    .ifPresent(
                             latest -> {
                                 throw new IllegalStateException(
                                         "Schema in filesystem exists, please use updating,"
@@ -151,25 +167,36 @@ public class SchemaManager implements Serializable {
                             options,
                             schema.comment());
 
-            boolean success = commit(newSchema);
+            boolean success = commit(branch, newSchema);
             if (success) {
                 return newSchema;
             }
         }
     }
 
-    /** Update {@link SchemaChange}s. */
     public TableSchema commitChanges(SchemaChange... changes) throws Exception {
-        return commitChanges(Arrays.asList(changes));
+        return commitChanges(branch, changes);
     }
 
     /** Update {@link SchemaChange}s. */
+    public TableSchema commitChanges(String branch, SchemaChange... changes) throws Exception {
+        return commitChanges(branch, Arrays.asList(changes));
+    }
+
     public TableSchema commitChanges(List<SchemaChange> changes)
+            throws Catalog.ColumnAlreadyExistException, Catalog.TableNotExistException,
+                    Catalog.ColumnNotExistException {
+        return commitChanges(branch, changes);
+    }
+
+    /** Update {@link SchemaChange}s. */
+    public TableSchema commitChanges(String branch, List<SchemaChange> changes)
             throws Catalog.TableNotExistException, Catalog.ColumnAlreadyExistException,
                     Catalog.ColumnNotExistException {
         while (true) {
             TableSchema schema =
-                    latest().orElseThrow(
+                    latest(branch)
+                            .orElseThrow(
                                     () ->
                                             new Catalog.TableNotExistException(
                                                     fromPath(tableRoot.toString(), true)));
@@ -361,7 +388,7 @@ public class SchemaManager implements Serializable {
                             newComment);
 
             try {
-                boolean success = commit(newSchema);
+                boolean success = commit(branch, newSchema);
                 if (success) {
                     return newSchema;
                 }
@@ -372,8 +399,13 @@ public class SchemaManager implements Serializable {
     }
 
     public boolean mergeSchema(RowType rowType, boolean allowExplicitCast) {
+        return mergeSchema(branch, rowType, allowExplicitCast);
+    }
+
+    public boolean mergeSchema(String branch, RowType rowType, boolean allowExplicitCast) {
         TableSchema current =
-                latest().orElseThrow(
+                latest(branch)
+                        .orElseThrow(
                                 () ->
                                         new RuntimeException(
                                                 "It requires that the current schema to exist when calling 'mergeSchema'"));
@@ -382,7 +414,7 @@ public class SchemaManager implements Serializable {
             return false;
         } else {
             try {
-                return commit(update);
+                return commit(branch, update);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to commit the schema.", e);
             }
@@ -455,9 +487,13 @@ public class SchemaManager implements Serializable {
 
     @VisibleForTesting
     boolean commit(TableSchema newSchema) throws Exception {
-        SchemaValidation.validateTableSchema(newSchema);
+        return commit(branch, newSchema);
+    }
 
-        Path schemaPath = toSchemaPath(newSchema.id());
+    @VisibleForTesting
+    boolean commit(String branchName, TableSchema newSchema) throws Exception {
+        SchemaValidation.validateTableSchema(newSchema);
+        Path schemaPath = toSchemaPath(branchName, newSchema.id());
         Callable<Boolean> callable = () -> fileIO.writeFileUtf8(schemaPath, newSchema.toString());
         if (lock == null) {
             return callable.call();
@@ -465,10 +501,15 @@ public class SchemaManager implements Serializable {
         return lock.runWithLock(callable);
     }
 
-    /** Read schema for schema id. */
     public TableSchema schema(long id) {
+        return schema(id, branch);
+    }
+
+    /** Read schema for schema id. */
+    public TableSchema schema(long id, String branch) {
         try {
-            return JsonSerdeUtil.fromJson(fileIO.readFileUtf8(toSchemaPath(id)), TableSchema.class);
+            return JsonSerdeUtil.fromJson(
+                    fileIO.readFileUtf8(toSchemaPath(branch, id)), TableSchema.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -486,18 +527,25 @@ public class SchemaManager implements Serializable {
         return new Path(tableRoot + "/schema");
     }
 
+    public Path schemaDirectory(String branchName) {
+        return branchName.equals(DEFAULT_MAIN_BRANCH)
+                ? schemaDirectory()
+                : new Path(getBranchPath(tableRoot, branchName) + "/schema");
+    }
+
     @VisibleForTesting
     public Path toSchemaPath(long id) {
         return new Path(tableRoot + "/schema/" + SCHEMA_PREFIX + id);
     }
 
-    public Path branchSchemaDirectory(String branchName) {
-        return new Path(getBranchPath(tableRoot, branchName) + "/schema");
-    }
-
-    public Path branchSchemaPath(String branchName, long schemaId) {
-        return new Path(
-                getBranchPath(tableRoot, branchName) + "/schema/" + SCHEMA_PREFIX + schemaId);
+    public Path toSchemaPath(String branchName, long schemaId) {
+        return branchName.equals(DEFAULT_MAIN_BRANCH)
+                ? toSchemaPath(schemaId)
+                : new Path(
+                        getBranchPath(tableRoot, branchName)
+                                + "/schema/"
+                                + SCHEMA_PREFIX
+                                + schemaId);
     }
 
     /**
@@ -506,7 +554,16 @@ public class SchemaManager implements Serializable {
      * @param schemaId the schema id to delete.
      */
     public void deleteSchema(long schemaId) {
-        fileIO.deleteQuietly(toSchemaPath(schemaId));
+        deleteSchema(branch, schemaId);
+    }
+
+    /**
+     * Delete schema with specific id.
+     *
+     * @param schemaId the schema id to delete.
+     */
+    public void deleteSchema(String branch, long schemaId) {
+        fileIO.deleteQuietly(toSchemaPath(branch, schemaId));
     }
 
     public static void checkAlterTableOption(String key) {

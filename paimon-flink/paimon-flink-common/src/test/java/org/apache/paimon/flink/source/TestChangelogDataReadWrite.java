@@ -47,6 +47,7 @@ import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.IntType;
 import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.utils.BranchManager;
 import org.apache.paimon.utils.FileStorePathFactory;
 import org.apache.paimon.utils.RecordWriter;
 import org.apache.paimon.utils.SnapshotManager;
@@ -79,14 +80,12 @@ public class TestChangelogDataReadWrite {
             new KeyValueFieldsExtractor() {
                 @Override
                 public List<DataField> keyFields(TableSchema schema) {
-                    return Collections.singletonList(
-                            new DataField(0, "k", new org.apache.paimon.types.BigIntType(false)));
+                    return Collections.singletonList(new DataField(0, "k", new BigIntType(false)));
                 }
 
                 @Override
                 public List<DataField> valueFields(TableSchema schema) {
-                    return Collections.singletonList(
-                            new DataField(0, "v", new org.apache.paimon.types.BigIntType(false)));
+                    return Collections.singletonList(new DataField(0, "v", new BigIntType(false)));
                 }
             };
 
@@ -110,15 +109,21 @@ public class TestChangelogDataReadWrite {
     }
 
     public TableRead createReadWithKey() {
-        return createRead(ValueContentRowDataRecordIterator::new);
+        return createRead(
+                ValueContentRowDataRecordIterator::new, BranchManager.DEFAULT_MAIN_BRANCH);
+    }
+
+    public TableRead createReadWithKey(String branch) {
+        return createRead(ValueContentRowDataRecordIterator::new, branch);
     }
 
     private TableRead createRead(
             Function<
                             RecordReader.RecordIterator<KeyValue>,
                             RecordReader.RecordIterator<InternalRow>>
-                    rowDataIteratorCreator) {
-        SchemaManager schemaManager = new SchemaManager(LocalFileIO.create(), tablePath);
+                    rowDataIteratorCreator,
+            String branch) {
+        SchemaManager schemaManager = new SchemaManager(LocalFileIO.create(), tablePath, branch);
         CoreOptions options = new CoreOptions(new HashMap<>());
         KeyValueFileStoreRead read =
                 new KeyValueFileStoreRead(
@@ -155,7 +160,13 @@ public class TestChangelogDataReadWrite {
 
     public List<DataFileMeta> writeFiles(
             BinaryRow partition, int bucket, List<Tuple2<Long, Long>> kvs) throws Exception {
-        RecordWriter<KeyValue> writer = createMergeTreeWriter(partition, bucket);
+        return writeFiles(partition, bucket, kvs, BranchManager.DEFAULT_MAIN_BRANCH);
+    }
+
+    public List<DataFileMeta> writeFiles(
+            BinaryRow partition, int bucket, List<Tuple2<Long, Long>> kvs, String branch)
+            throws Exception {
+        RecordWriter<KeyValue> writer = createMergeTreeWriter(partition, bucket, branch);
         for (Tuple2<Long, Long> tuple2 : kvs) {
             writer.write(
                     new KeyValue()
@@ -170,12 +181,17 @@ public class TestChangelogDataReadWrite {
     }
 
     public RecordWriter<KeyValue> createMergeTreeWriter(BinaryRow partition, int bucket) {
+        return createMergeTreeWriter(partition, bucket, BranchManager.DEFAULT_MAIN_BRANCH);
+    }
+
+    public RecordWriter<KeyValue> createMergeTreeWriter(
+            BinaryRow partition, int bucket, String branch) {
         CoreOptions options =
                 new CoreOptions(Collections.singletonMap(CoreOptions.FILE_FORMAT.key(), "avro"));
 
         Map<String, FileStorePathFactory> pathFactoryMap = new HashMap<>();
         pathFactoryMap.put("avro", pathFactory);
-        SchemaManager schemaManager = new SchemaManager(LocalFileIO.create(), tablePath);
+        SchemaManager schemaManager = new SchemaManager(LocalFileIO.create(), tablePath, branch);
         RecordWriter<KeyValue> writer =
                 new KeyValueFileStoreWrite(
                                 LocalFileIO.create(),

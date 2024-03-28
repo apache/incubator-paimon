@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.sink.cdc;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.SchemaChange;
@@ -72,7 +73,10 @@ public class MultiTableUpdatedDataFieldsProcessFunction
                             } catch (Catalog.TableNotExistException e) {
                                 return null;
                             }
-                            return new SchemaManager(table.fileIO(), table.location());
+                            return new SchemaManager(
+                                    table.fileIO(),
+                                    table.location(),
+                                    CoreOptions.branch(table.options()));
                         });
 
         if (Objects.isNull(schemaManager)) {

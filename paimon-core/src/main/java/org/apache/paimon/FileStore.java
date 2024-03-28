@@ -63,8 +63,6 @@ public interface FileStore<T> extends Serializable {
 
     FileStoreScan newScan();
 
-    FileStoreScan newScan(String branchName);
-
     ManifestList.Factory manifestListFactory();
 
     ManifestFile.Factory manifestFileFactory();

@@ -333,7 +333,7 @@ public class HiveCatalog extends AbstractCatalog {
             throw new TableNotExistException(identifier);
         }
         Path tableLocation = getDataTableLocation(identifier);
-        return new SchemaManager(fileIO, tableLocation)
+        return new SchemaManager(fileIO, tableLocation, branchName)
                 .latest()
                 .orElseThrow(
                         () -> new RuntimeException("There is no paimon table in " + tableLocation));
@@ -415,7 +415,7 @@ public class HiveCatalog extends AbstractCatalog {
             client.alter_table(fromDB, fromTableName, table);
 
             Path fromPath = getDataTableLocation(fromTable);
-            if (new SchemaManager(fileIO, fromPath).listAllIds().size() > 0) {
+            if (new SchemaManager(fileIO, fromPath, branchName).listAllIds().size() > 0) {
                 // Rename the file system's table directory. Maintain consistency between tables in
                 // the file system and tables in the Hive Metastore.
                 Path toPath = getDataTableLocation(toTable);
@@ -581,7 +581,7 @@ public class HiveCatalog extends AbstractCatalog {
     }
 
     private SchemaManager schemaManager(Identifier identifier) {
-        return new SchemaManager(fileIO, getDataTableLocation(identifier))
+        return new SchemaManager(fileIO, getDataTableLocation(identifier), branchName)
                 .withLock(lock(identifier));
     }
 

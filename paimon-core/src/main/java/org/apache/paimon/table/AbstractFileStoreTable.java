@@ -69,7 +69,6 @@ import java.util.SortedMap;
 import java.util.function.BiConsumer;
 
 import static org.apache.paimon.CoreOptions.PATH;
-import static org.apache.paimon.utils.BranchManager.DEFAULT_MAIN_BRANCH;
 import static org.apache.paimon.utils.Preconditions.checkArgument;
 import static org.apache.paimon.utils.Preconditions.checkNotNull;
 
@@ -136,13 +135,13 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
 
     @Override
     public SnapshotReader newSnapshotReader() {
-        return newSnapshotReader(DEFAULT_MAIN_BRANCH);
+        return newSnapshotReader(CoreOptions.branch(options()));
     }
 
     @Override
     public SnapshotReader newSnapshotReader(String branchName) {
         return new SnapshotReaderImpl(
-                store().newScan(branchName),
+                store().newScan(),
                 tableSchema,
                 coreOptions(),
                 snapshotManager(),
@@ -248,7 +247,8 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
     @Override
     public FileStoreTable copyWithLatestSchema() {
         Map<String, String> options = tableSchema.options();
-        SchemaManager schemaManager = new SchemaManager(fileIO(), location());
+        SchemaManager schemaManager =
+                new SchemaManager(fileIO(), location(), CoreOptions.branch(options()));
         Optional<TableSchema> optionalLatestSchema = schemaManager.latest();
         if (optionalLatestSchema.isPresent()) {
             TableSchema newTableSchema = optionalLatestSchema.get();
@@ -261,7 +261,7 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
     }
 
     protected SchemaManager schemaManager() {
-        return new SchemaManager(fileIO(), path);
+        return new SchemaManager(fileIO(), path, CoreOptions.branch(options()));
     }
 
     @Override
@@ -301,7 +301,7 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
     @Override
     public TableCommitImpl newCommit(String commitUser) {
         // Compatibility with previous design, the main branch is written by default
-        return newCommit(commitUser, DEFAULT_MAIN_BRANCH);
+        return newCommit(commitUser, CoreOptions.branch(options()));
     }
 
     public TableCommitImpl newCommit(String commitUser, String branchName) {
@@ -510,7 +510,7 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
 
     @Override
     public TagManager tagManager() {
-        return new TagManager(fileIO, path);
+        return new TagManager(fileIO, path, CoreOptions.branch(options()));
     }
 
     @Override

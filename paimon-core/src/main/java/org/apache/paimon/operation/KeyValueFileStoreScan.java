@@ -75,8 +75,7 @@ public class KeyValueFileStoreScan extends AbstractFileStoreScan {
                 manifestListFactory,
                 numOfBuckets,
                 checkNumOfBuckets,
-                scanManifestParallelism,
-                branchName);
+                scanManifestParallelism);
         this.fieldKeyStatsConverters =
                 new FieldStatsConverters(
                         sid -> keyValueFieldsExtractor.keyFields(scanTableSchema(sid)),

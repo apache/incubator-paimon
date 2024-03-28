@@ -118,7 +118,7 @@ public class FileSystemCatalog extends AbstractCatalog {
     }
 
     private boolean tableExists(Path tablePath) {
-        return new SchemaManager(fileIO, tablePath).listAllIds().size() > 0;
+        return new SchemaManager(fileIO, tablePath, branchName).listAllIds().size() > 0;
     }
 
     @Override
@@ -152,7 +152,7 @@ public class FileSystemCatalog extends AbstractCatalog {
                                                                         new RuntimeException(
                                                                                 "No lock context when lock is enabled."))))
                         .orElse(null);
-        return new SchemaManager(fileIO, path)
+        return new SchemaManager(fileIO, path, branchName)
                 .withLock(catalogLock == null ? null : Lock.fromCatalog(catalogLock, identifier));
     }
 

@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.sink.cdc;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkConnectorOptions;
@@ -190,7 +191,10 @@ public class FlinkCdcSyncDatabaseSinkBuilder<T> {
                                             .createUpdatedDataFieldsOutputTag(table.name()))
                             .process(
                                     new UpdatedDataFieldsProcessFunction(
-                                            new SchemaManager(table.fileIO(), table.location()),
+                                            new SchemaManager(
+                                                    table.fileIO(),
+                                                    table.location(),
+                                                    CoreOptions.branch(table.options())),
                                             Identifier.create(database, table.name()),
                                             catalogLoader));
             schemaChangeProcessFunction.getTransformation().setParallelism(1);
