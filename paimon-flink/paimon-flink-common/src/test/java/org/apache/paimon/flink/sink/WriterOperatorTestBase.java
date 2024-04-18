@@ -55,8 +55,11 @@ import java.util.Optional;
 
 /** test class for {@link TableWriteOperator}. */
 public abstract class WriterOperatorTestBase {
+
     private static final RowType ROW_TYPE =
             RowType.of(new DataType[] {DataTypes.INT(), DataTypes.INT()}, new String[] {"a", "b"});
+    protected static final String COMMIT_USER = "test";
+
     @TempDir public java.nio.file.Path tempDir;
     protected Path tablePath;
 
@@ -112,7 +115,7 @@ public abstract class WriterOperatorTestBase {
     }
 
     @NotNull
-    private static OneInputStreamOperatorTestHarness<InternalRow, Committable>
+    protected static OneInputStreamOperatorTestHarness<InternalRow, Committable>
             createWriteOperatorHarness(
                     FileStoreTable fileStoreTable, RowDataStoreWriteOperator operator)
                     throws Exception {
@@ -126,7 +129,7 @@ public abstract class WriterOperatorTestBase {
     }
 
     @NotNull
-    private static RowDataStoreWriteOperator getRowDataStoreWriteOperator(
+    protected static RowDataStoreWriteOperator getRowDataStoreWriteOperator(
             FileStoreTable fileStoreTable) {
         StoreSinkWrite.Provider provider =
                 (table, commitUser, state, ioManager, memoryPool, metricGroup) ->
@@ -141,7 +144,7 @@ public abstract class WriterOperatorTestBase {
                                 memoryPool,
                                 metricGroup);
         RowDataStoreWriteOperator operator =
-                new RowDataStoreWriteOperator(fileStoreTable, null, provider, "test");
+                new RowDataStoreWriteOperator(fileStoreTable, null, provider, COMMIT_USER);
         return operator;
     }
 
@@ -153,21 +156,21 @@ public abstract class WriterOperatorTestBase {
         setTableConfig(conf);
         SchemaManager schemaManager = new SchemaManager(LocalFileIO.create(), tablePath);
 
-        List<String> primaryKeys = setKeys(conf, CoreOptions.PRIMARY_KEY);
-        List<String> paritionKeys = setKeys(conf, CoreOptions.PARTITION);
+        List<String> primaryKeys = extractListOption(conf, CoreOptions.PRIMARY_KEY);
+        List<String> partitionKeys = extractListOption(conf, CoreOptions.PARTITION);
 
         schemaManager.createTable(
-                new Schema(ROW_TYPE.getFields(), paritionKeys, primaryKeys, conf.toMap(), ""));
+                new Schema(ROW_TYPE.getFields(), partitionKeys, primaryKeys, conf.toMap(), ""));
         return FileStoreTableFactory.create(LocalFileIO.create(), conf);
     }
 
     @NotNull
-    private static List<String> setKeys(Options conf, ConfigOption<String> primaryKey) {
-        List<String> primaryKeys =
-                Optional.ofNullable(conf.get(CoreOptions.PRIMARY_KEY))
+    private static List<String> extractListOption(Options conf, ConfigOption<String> option) {
+        List<String> result =
+                Optional.ofNullable(conf.get(option))
                         .map(key -> Arrays.asList(key.split(",")))
                         .orElse(Collections.emptyList());
-        conf.remove(primaryKey.key());
-        return primaryKeys;
+        conf.remove(option.key());
+        return result;
     }
 }
