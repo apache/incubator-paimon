@@ -47,9 +47,11 @@ import org.apache.paimon.types.DataTypes;
 import org.apache.flink.table.hive.LegacyHiveClasses;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -419,7 +421,7 @@ public class HiveCatalog extends AbstractCatalog {
             Table table = client.getTable(fromDB, fromTableName);
             table.setDbName(toTable.getDatabaseName());
             table.setTableName(toTable.getObjectName());
-            client.alter_table(fromDB, fromTableName, table);
+            alterTableByEnvContext(fromDB, fromTableName, table);
 
             Path fromPath = getDataTableLocation(fromTable);
             if (new SchemaManager(fileIO, fromPath).listAllIds().size() > 0) {
@@ -438,7 +440,7 @@ public class HiveCatalog extends AbstractCatalog {
 
                 // update location
                 locationHelper.specifyTableLocation(table, toPath.toString());
-                client.alter_table(toTable.getDatabaseName(), toTable.getObjectName(), table);
+                alterTableByEnvContext(toTable.getDatabaseName(), toTable.getObjectName(), table);
             }
         } catch (TException e) {
             throw new RuntimeException("Failed to rename table " + fromTable.getFullName(), e);
@@ -458,12 +460,39 @@ public class HiveCatalog extends AbstractCatalog {
             Table table = client.getTable(identifier.getDatabaseName(), identifier.getObjectName());
             updateHmsTablePars(table, schema);
             updateHmsTable(table, identifier, schema);
-            client.alter_table(
-                    identifier.getDatabaseName(), identifier.getObjectName(), table, true);
+            alterTableByEnvContext(identifier.getDatabaseName(), identifier.getObjectName(), table);
         } catch (Exception te) {
             schemaManager.deleteSchema(schema.id());
             throw new RuntimeException(te);
         }
+    }
+
+    /**
+     * Get EnvironmentContext with cascade param.
+     *
+     * @return EnvironmentContext
+     */
+    private EnvironmentContext getEnvironmentContext() {
+        EnvironmentContext environmentContext = new EnvironmentContext();
+        environmentContext.putToProperties(
+                StatsSetupConst.CASCADE, StatsSetupConst.TRUE);
+        return environmentContext;
+    }
+
+    private void alterTableByEnvContext(String databaseName, String objectName, Table table)
+            throws TException {
+        boolean skipTableStatsProperty =
+                hiveConf.getBoolean(
+                        HiveCatalogOptions.TABLE_STATS_SKIP.key(),
+                        HiveCatalogOptions.TABLE_STATS_SKIP.defaultValue());
+        EnvironmentContext environmentContext = getEnvironmentContext();
+        if (skipTableStatsProperty) {
+            // Avoid Hive metastore read SD location path data.
+            environmentContext.putToProperties(
+                    StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE);
+        }
+        client.alter_table_with_environmentContext(
+                databaseName, objectName, table, environmentContext);
     }
 
     @Override
