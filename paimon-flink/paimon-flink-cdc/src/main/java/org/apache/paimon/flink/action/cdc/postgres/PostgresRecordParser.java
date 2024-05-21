@@ -25,11 +25,14 @@ import org.apache.paimon.flink.action.cdc.TypeMapping;
 import org.apache.paimon.flink.action.cdc.mysql.format.DebeziumEvent;
 import org.apache.paimon.flink.sink.cdc.CdcRecord;
 import org.apache.paimon.flink.sink.cdc.RichCdcMultiplexRecord;
+import org.apache.paimon.schema.TableSchema;
+import org.apache.paimon.types.CharType;
 import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.DataTypes;
 import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.types.VarCharType;
 import org.apache.paimon.utils.DateTimeUtils;
 import org.apache.paimon.utils.Preconditions;
 import org.apache.paimon.utils.StringUtils;
@@ -70,6 +73,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.columnCaseConvertAndDuplicateCheck;
 import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.columnDuplicateErrMsg;
@@ -78,6 +82,7 @@ import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.recordKeyD
 import static org.apache.paimon.flink.action.cdc.TypeMapping.TypeMappingMode.TO_NULLABLE;
 import static org.apache.paimon.flink.action.cdc.TypeMapping.TypeMappingMode.TO_STRING;
 import static org.apache.paimon.flink.action.cdc.format.debezium.DebeziumSchemaUtils.decimalLogicalName;
+import static org.apache.paimon.types.VarCharType.MIN_LENGTH;
 import static org.apache.paimon.utils.JsonSerdeUtil.isNull;
 
 /**
@@ -101,18 +106,21 @@ public class PostgresRecordParser
     private String currentTable;
     private String databaseName;
     private final CdcMetadataConverter[] metadataConverters;
+    private TableSchema paimonSchema;
 
     public PostgresRecordParser(
             Configuration postgresConfig,
             boolean caseSensitive,
             TypeMapping typeMapping,
-            CdcMetadataConverter[] metadataConverters) {
+            CdcMetadataConverter[] metadataConverters,
+            TableSchema schema) {
         this(
                 postgresConfig,
                 caseSensitive,
                 Collections.emptyList(),
                 typeMapping,
-                metadataConverters);
+                metadataConverters,
+                schema);
     }
 
     public PostgresRecordParser(
@@ -120,7 +128,8 @@ public class PostgresRecordParser
             boolean caseSensitive,
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
-            CdcMetadataConverter[] metadataConverters) {
+            CdcMetadataConverter[] metadataConverters,
+            TableSchema paimonSchema) {
         this.caseSensitive = caseSensitive;
         this.computedColumns = computedColumns;
         this.typeMapping = typeMapping;
@@ -133,6 +142,7 @@ public class PostgresRecordParser
                 stringifyServerTimeZone == null
                         ? ZoneId.systemDefault()
                         : ZoneId.of(stringifyServerTimeZone);
+        this.paimonSchema = paimonSchema;
     }
 
     @Override
@@ -146,7 +156,7 @@ public class PostgresRecordParser
         extractRecords().forEach(out::collect);
     }
 
-    private List<DataField> extractFields(DebeziumEvent.Field schema) {
+    private List<DataField> extractFields(DebeziumEvent.Field schema, JsonNode afterData) {
         Map<String, DebeziumEvent.Field> afterFields = schema.afterFields();
         Preconditions.checkArgument(
                 !afterFields.isEmpty(),
@@ -157,16 +167,22 @@ public class PostgresRecordParser
         RowType.Builder rowType = RowType.builder();
         Set<String> existedFields = new HashSet<>();
         Function<String, String> columnDuplicateErrMsg = columnDuplicateErrMsg(currentTable);
+
+        Map<String, DataField> paimonFields =
+                paimonSchema.fields().stream()
+                        .collect(Collectors.toMap(DataField::name, Function.identity()));
+
         afterFields.forEach(
-                (key, value) -> {
+                (key, afterField) -> {
                     String columnName =
                             columnCaseConvertAndDuplicateCheck(
                                     key, existedFields, caseSensitive, columnDuplicateErrMsg);
 
-                    DataType dataType = extractFieldType(value);
+                    DataType dataType =
+                            extractFieldType(afterField, paimonFields.get(key), afterData);
                     dataType =
                             dataType.copy(
-                                    typeMapping.containsMode(TO_NULLABLE) || value.optional());
+                                    typeMapping.containsMode(TO_NULLABLE) || afterField.optional());
 
                     rowType.field(columnName, dataType);
                 });
@@ -177,7 +193,8 @@ public class PostgresRecordParser
      * Extract fields from json records, see <a
      * href="https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-data-types">postgresql-data-types</a>.
      */
-    private DataType extractFieldType(DebeziumEvent.Field field) {
+    private DataType extractFieldType(
+            DebeziumEvent.Field field, DataField paimonField, JsonNode afterData) {
         switch (field.type()) {
             case "array":
                 return DataTypes.ARRAY(DataTypes.STRING());
@@ -209,6 +226,18 @@ public class PostgresRecordParser
             case "boolean":
                 return DataTypes.BOOLEAN();
             case "string":
+                int newLength = afterData.get(field.field()).asText().length();
+                if (paimonField == null) {
+                    return DataTypes.VARCHAR(newLength == 0 ? MIN_LENGTH : newLength);
+                } else if (paimonField.type() instanceof VarCharType) {
+                    int oldLength = ((VarCharType) paimonField.type()).getLength();
+                    return DataTypes.VARCHAR(
+                            Math.max(oldLength, newLength == 0 ? MIN_LENGTH : newLength));
+                } else if (paimonField.type() instanceof CharType) {
+                    int oldLength = ((CharType) paimonField.type()).getLength();
+                    return DataTypes.CHAR(
+                            Math.max(oldLength, newLength == 0 ? MIN_LENGTH : newLength));
+                }
                 return DataTypes.STRING();
             case "bytes":
                 if (decimalLogicalName().equals(field.name())) {
@@ -248,7 +277,7 @@ public class PostgresRecordParser
         Map<String, String> after = extractRow(root.payload().after());
         if (!after.isEmpty()) {
             after = mapKeyCaseConvert(after, caseSensitive, recordKeyDuplicateErrMsg(after));
-            List<DataField> fields = extractFields(root.schema());
+            List<DataField> fields = extractFields(root.schema(), root.payload().after());
             records.add(
                     new RichCdcMultiplexRecord(
                             databaseName,
