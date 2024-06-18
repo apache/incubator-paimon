@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import static org.apache.paimon.catalog.FileSystemCatalogOptions.CASE_SENSITIVE;
@@ -169,5 +170,17 @@ public class FileSystemCatalog extends AbstractCatalog {
     @Override
     public boolean caseSensitive() {
         return catalogOptions.get(CASE_SENSITIVE);
+    }
+
+    @Override
+    public Optional<CatalogLockContext> lockContext() {
+        Optional<CatalogLockContextFactory> catalogLockContextFactory = lockContextFactory();
+        if (!catalogLockContextFactory.isPresent()) {
+            return super.lockContext();
+        }
+        return catalogLockContextFactory.map(
+                factory ->
+                        factory.createLockContext(
+                                extractLockConfiguration(catalogOptions.toMap())));
     }
 }
