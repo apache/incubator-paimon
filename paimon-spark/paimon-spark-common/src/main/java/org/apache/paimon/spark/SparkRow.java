@@ -170,7 +170,8 @@ public class SparkRow implements InternalRow, Serializable {
 
     private static Timestamp toPaimonTimestamp(Object object) {
         if (object instanceof java.sql.Timestamp) {
-            return Timestamp.fromSQLTimestamp((java.sql.Timestamp) object);
+            java.sql.Timestamp ts = (java.sql.Timestamp) object;
+            return DateTimeUtils.toInternalUTC(ts.getTime(), ts.getNanos());
         } else if (object instanceof java.time.Instant) {
             LocalDateTime localDateTime =
                     LocalDateTime.ofInstant((Instant) object, ZoneId.systemDefault());

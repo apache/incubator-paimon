@@ -34,7 +34,6 @@ import org.apache.paimon.types.RowType;
 
 import org.apache.spark.sql.catalyst.util.ArrayBasedMapData;
 import org.apache.spark.sql.catalyst.util.ArrayData;
-import org.apache.spark.sql.catalyst.util.DateTimeUtils;
 import org.apache.spark.sql.catalyst.util.MapData;
 import org.apache.spark.sql.types.BinaryType;
 import org.apache.spark.sql.types.BooleanType;
@@ -283,7 +282,7 @@ public class SparkInternalRow extends org.apache.spark.sql.catalyst.InternalRow 
     }
 
     public static long fromPaimon(Timestamp timestamp) {
-        return DateTimeUtils.fromJavaTimestamp(timestamp.toSQLTimestamp());
+        return timestamp.toMicros();
     }
 
     public static ArrayData fromPaimon(InternalArray array, ArrayType arrayType) {
