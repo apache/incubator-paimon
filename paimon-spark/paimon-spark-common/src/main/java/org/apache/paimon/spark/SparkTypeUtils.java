@@ -46,6 +46,7 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.LongType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType$;
 import org.apache.spark.sql.types.UserDefinedType;
 
 import java.util.ArrayList;
@@ -150,7 +151,12 @@ public class SparkTypeUtils {
 
         @Override
         public DataType visit(TimestampType timestampType) {
-            return DataTypes.TimestampNTZType;
+            try {
+                return DataTypes.TimestampNTZType;
+            } catch (java.lang.NoSuchFieldError e) {
+                // For compatibility with old paimon table written by Spark3.3-
+                return TimestampNTZType$.MODULE$;
+            }
         }
 
         @Override
