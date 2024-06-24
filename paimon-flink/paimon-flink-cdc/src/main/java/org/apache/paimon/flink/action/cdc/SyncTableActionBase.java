@@ -157,7 +157,8 @@ public abstract class SyncTableActionBase extends SynchronizationActionBase {
 
     @Override
     protected FlatMapFunction<CdcSourceRecord, RichCdcMultiplexRecord> recordParse() {
-        return syncJobHandler.provideRecordParser(computedColumns, typeMapping, metadataConverters, fileStoreTable.schema());
+        return syncJobHandler.provideRecordParser(
+                computedColumns, typeMapping, metadataConverters, fileStoreTable.schema());
     }
 
     @Override

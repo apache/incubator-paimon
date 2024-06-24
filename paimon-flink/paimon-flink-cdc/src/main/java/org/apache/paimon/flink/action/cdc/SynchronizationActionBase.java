@@ -204,7 +204,9 @@ public abstract class SynchronizationActionBase extends ActionBase {
 
         List<SchemaChange> columnChanges =
                 UpdatedDataFieldsProcessFunction.extractSchemaChanges(
-                        new SchemaManager(table.fileIO(), table.location()), paimonSchema.fields());
+                        new SchemaManager(table.fileIO(), table.location()),
+                        paimonSchema.fields(),
+                        caseSensitive);
 
         changes.addAll(columnChanges);
         try {

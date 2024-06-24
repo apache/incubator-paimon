@@ -197,12 +197,10 @@ public class SyncJobHandler {
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
             CdcMetadataConverter[] metadataConverters) {
-        return this.provideRecordParser(
-                caseSensitive, computedColumns, typeMapping, metadataConverters, null);
+        return this.provideRecordParser(computedColumns, typeMapping, metadataConverters, null);
     }
 
     public FlatMapFunction<CdcSourceRecord, RichCdcMultiplexRecord> provideRecordParser(
-            boolean caseSensitive,
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
             CdcMetadataConverter[] metadataConverters,
@@ -213,7 +211,11 @@ public class SyncJobHandler {
                         cdcSourceConfig, computedColumns, typeMapping, metadataConverters);
             case POSTGRES:
                 return new PostgresRecordParser(
-                        cdcSourceConfig, computedColumns, typeMapping, metadataConverters, paimonSchema);
+                        cdcSourceConfig,
+                        computedColumns,
+                        typeMapping,
+                        metadataConverters,
+                        paimonSchema);
             case KAFKA:
             case PULSAR:
                 DataFormat dataFormat = provideDataFormat();
