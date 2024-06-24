@@ -66,6 +66,10 @@ public interface SnapshotReader {
 
     SnapshotReader withBucketFilter(Filter<Integer> bucketFilter);
 
+    SnapshotReader withDataFileNameFilter(Filter<String> fileNameFilter);
+
+    SnapshotReader withShard(int indexOfThisSubtask, int numberOfParallelSubtasks);
+
     SnapshotReader withMetricRegistry(MetricRegistry registry);
 
     /** Get splits plan from snapshot. */

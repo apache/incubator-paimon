@@ -38,6 +38,8 @@ CREATE TABLE my_table (
     product_id BIGINT,
     price DOUBLE,
     sales BIGINT
+) WITH (
+    'file.compression.zstd-level' = '3'
 );
 ```
 {{< /tab >}}

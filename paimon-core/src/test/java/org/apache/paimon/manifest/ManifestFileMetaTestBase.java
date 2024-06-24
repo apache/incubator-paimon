@@ -83,8 +83,8 @@ public abstract class ManifestFileMetaTestBase {
                         Collections.emptyList(),
                         Timestamp.fromEpochMillis(200000),
                         0L, // not used
-                        null // not used
-                        ));
+                        null, // not used
+                        FileSource.APPEND));
     }
 
     protected ManifestFileMeta makeManifest(ManifestEntry... entries) {
@@ -128,6 +128,7 @@ public abstract class ManifestFileMetaTestBase {
                         new SchemaManager(fileIO, path),
                         getPartitionType(),
                         avro,
+                        "zstd",
                         new FileStorePathFactory(
                                 path,
                                 getPartitionType(),
@@ -245,6 +246,7 @@ public abstract class ManifestFileMetaTestBase {
                         0, // not used
                         0, // not used
                         0L,
-                        null));
+                        null,
+                        FileSource.APPEND));
     }
 }

@@ -30,7 +30,7 @@ under the License.
 
 Table specified system tables contain metadata and information about each table, such as the snapshots created and the options in use. Users can access system tables with batch queries.
 
-Currently, Flink, Spark and Trino supports querying system tables.
+Currently, Flink, Spark, Trino and StarRocks support querying system tables.
 
 In some cases, the table name needs to be enclosed with back quotes to avoid syntax parsing conflicts, for example triple access mode:
 ```sql
@@ -283,11 +283,11 @@ You can query the partition files of the table.
 SELECT * FROM my_table$partitions;
 
 /*
-+---------------+----------------+--------------------+
-|  partition    |   record_count |  file_size_in_bytes|
-+---------------+----------------+--------------------+
-|  [1]          |           1    |             645    |
-+---------------+----------------+--------------------+
++---------------+----------------+--------------------+--------------------+------------------------+
+|  partition    |   record_count |  file_size_in_bytes|          file_count|        last_update_time|
++---------------+----------------+--------------------+--------------------+------------------------+
+|  [1]          |           1    |             645    |                1   | 2024-06-24 10:25:57.400|
++---------------+----------------+--------------------+--------------------+------------------------+
 */
 ```
 

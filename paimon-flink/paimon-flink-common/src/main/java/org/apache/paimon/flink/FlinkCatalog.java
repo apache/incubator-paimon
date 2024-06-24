@@ -32,8 +32,8 @@ import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.table.source.ReadBuilder;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.InternalRowPartitionComputer;
 import org.apache.paimon.utils.Preconditions;
-import org.apache.paimon.utils.RowDataPartitionComputer;
 import org.apache.paimon.utils.StringUtils;
 
 import org.apache.flink.table.api.TableSchema;
@@ -194,13 +194,7 @@ public class FlinkCatalog extends AbstractCatalog {
     @Override
     public void createDatabase(String name, CatalogDatabase database, boolean ignoreIfExists)
             throws DatabaseAlreadyExistException, CatalogException {
-        // todo: flink hive catalog support create db with props
         if (database != null) {
-            if (database.getProperties().size() > 0) {
-                throw new UnsupportedOperationException(
-                        "Create database with properties is unsupported.");
-            }
-
             if (database.getDescription().isPresent()
                     && !database.getDescription().get().equals("")) {
                 throw new UnsupportedOperationException(
@@ -209,7 +203,10 @@ public class FlinkCatalog extends AbstractCatalog {
         }
 
         try {
-            catalog.createDatabase(name, ignoreIfExists);
+            catalog.createDatabase(
+                    name,
+                    ignoreIfExists,
+                    database == null ? Collections.emptyMap() : database.getProperties());
         } catch (Catalog.DatabaseAlreadyExistException e) {
             throw new DatabaseAlreadyExistException(getName(), e.database());
         }
@@ -860,7 +857,7 @@ public class FlinkCatalog extends AbstractCatalog {
             org.apache.paimon.types.RowType partitionRowType =
                     fileStoreTable.schema().logicalPartitionType();
 
-            RowDataPartitionComputer partitionComputer =
+            InternalRowPartitionComputer partitionComputer =
                     FileStorePathFactory.getPartitionComputer(
                             partitionRowType,
                             new CoreOptions(table.options()).partitionDefaultName());

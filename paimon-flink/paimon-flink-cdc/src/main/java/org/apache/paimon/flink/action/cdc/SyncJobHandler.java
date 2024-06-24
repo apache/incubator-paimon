@@ -194,7 +194,6 @@ public class SyncJobHandler {
     }
 
     public FlatMapFunction<CdcSourceRecord, RichCdcMultiplexRecord> provideRecordParser(
-            boolean caseSensitive,
             List<ComputedColumn> computedColumns,
             TypeMapping typeMapping,
             CdcMetadataConverter[] metadataConverters) {
@@ -211,25 +210,16 @@ public class SyncJobHandler {
         switch (sourceType) {
             case MYSQL:
                 return new MySqlRecordParser(
-                        cdcSourceConfig,
-                        caseSensitive,
-                        computedColumns,
-                        typeMapping,
-                        metadataConverters);
+                        cdcSourceConfig, computedColumns, typeMapping, metadataConverters);
             case POSTGRES:
                 return new PostgresRecordParser(
-                        cdcSourceConfig,
-                        caseSensitive,
-                        computedColumns,
-                        typeMapping,
-                        metadataConverters,
-                        paimonSchema);
+                        cdcSourceConfig, computedColumns, typeMapping, metadataConverters, paimonSchema);
             case KAFKA:
             case PULSAR:
                 DataFormat dataFormat = provideDataFormat();
-                return dataFormat.createParser(caseSensitive, typeMapping, computedColumns);
+                return dataFormat.createParser(typeMapping, computedColumns);
             case MONGODB:
-                return new MongoDBRecordParser(caseSensitive, computedColumns, cdcSourceConfig);
+                return new MongoDBRecordParser(computedColumns, cdcSourceConfig);
             default:
                 throw new UnsupportedOperationException("Unknown source type " + sourceType);
         }

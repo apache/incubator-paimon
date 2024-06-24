@@ -30,6 +30,7 @@ import org.apache.paimon.data.GenericMap;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.data.JoinedRow;
+import org.apache.paimon.disk.IOManager;
 import org.apache.paimon.fs.FileIOFinder;
 import org.apache.paimon.fs.FileStatus;
 import org.apache.paimon.fs.Path;
@@ -114,6 +115,7 @@ import static org.apache.paimon.CoreOptions.SNAPSHOT_NUM_RETAINED_MIN;
 import static org.apache.paimon.CoreOptions.WRITE_ONLY;
 import static org.apache.paimon.testutils.assertj.PaimonAssertions.anyCauseMatches;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -375,15 +377,71 @@ public abstract class FileStoreTableTestBase {
         commit.commit(0, write.prepareCommit(true, 0));
         write.close();
         commit.close();
-
         List<Split> splits =
-                toSplits(
-                        table.newSnapshotReader()
-                                .withFilter(new PredicateBuilder(ROW_TYPE).equal(1, 5))
-                                .read()
-                                .dataSplits());
+                table.newReadBuilder()
+                        .withBucketFilter(bucketId -> bucketId == 1)
+                        .newScan()
+                        .plan()
+                        .splits();
         assertThat(splits.size()).isEqualTo(1);
         assertThat(((DataSplit) splits.get(0)).bucket()).isEqualTo(1);
+    }
+
+    protected void innerTestWithShard(FileStoreTable table) throws Exception {
+        StreamTableWrite write =
+                table.newWrite(commitUser).withIOManager(IOManager.create(tempDir.toString()));
+        write.write(rowData(1, 1, 2L));
+        write.write(rowData(1, 3, 4L));
+        write.write(rowData(1, 5, 6L));
+        write.write(rowData(1, 7, 8L));
+        write.write(rowData(1, 9, 10L));
+        TableCommitImpl commit = table.newCommit(commitUser);
+        commit.commit(0, write.prepareCommit(true, 0));
+        write.close();
+        commit.close();
+
+        ReadBuilder readBuilder = table.newReadBuilder();
+
+        List<Split> splits = new ArrayList<>();
+        splits.addAll(readBuilder.withShard(0, 3).newScan().plan().splits());
+        splits.addAll(readBuilder.withShard(1, 3).newScan().plan().splits());
+        splits.addAll(readBuilder.withShard(2, 3).newScan().plan().splits());
+
+        assertThat(getResult(readBuilder.newRead(), splits, BATCH_ROW_TO_STRING))
+                .hasSameElementsAs(
+                        Arrays.asList(
+                                "1|3|4|binary|varbinary|mapKey:mapVal|multiset",
+                                "1|9|10|binary|varbinary|mapKey:mapVal|multiset",
+                                "1|1|2|binary|varbinary|mapKey:mapVal|multiset",
+                                "1|5|6|binary|varbinary|mapKey:mapVal|multiset",
+                                "1|7|8|binary|varbinary|mapKey:mapVal|multiset"));
+    }
+
+    @Test
+    public void testBucketFilterConflictWithShard() throws Exception {
+        String exceptionMessage = "Bucket filter and shard configuration cannot be used together";
+        FileStoreTable table =
+                createFileStoreTable(
+                        conf -> {
+                            conf.set(BUCKET, 5);
+                            conf.set(BUCKET_KEY, "a");
+                        });
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(
+                        () ->
+                                table.newReadBuilder()
+                                        .withBucketFilter(bucketId -> bucketId == 1)
+                                        .withShard(0, 1)
+                                        .newScan())
+                .withMessageContaining(exceptionMessage);
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(
+                        () ->
+                                table.newReadBuilder()
+                                        .withShard(0, 1)
+                                        .withBucketFilter(bucketId -> bucketId == 1)
+                                        .newStreamScan())
+                .withMessageContaining(exceptionMessage);
     }
 
     @Test
@@ -1108,6 +1166,136 @@ public abstract class FileStoreTableTestBase {
     }
 
     @Test
+    public void testMergeBranch() throws Exception {
+        FileStoreTable table = createFileStoreTable();
+        generateBranch(table);
+        FileStoreTable tableBranch = createFileStoreTable(BRANCH_NAME);
+
+        // Verify branch1 and the main branch have the same data
+        assertThat(
+                        getResult(
+                                tableBranch.newRead(),
+                                toSplits(tableBranch.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder("0|0|0|binary|varbinary|mapKey:mapVal|multiset");
+
+        // Test for unsupported branch name
+        assertThatThrownBy(() -> table.mergeBranch("test-branch"))
+                .satisfies(
+                        anyCauseMatches(
+                                IllegalArgumentException.class,
+                                "Branch name 'test-branch' doesn't exist."));
+
+        assertThatThrownBy(() -> table.mergeBranch("main"))
+                .satisfies(
+                        anyCauseMatches(
+                                IllegalArgumentException.class,
+                                "Branch name 'main' do not use in merge branch."));
+
+        // Write data to branch1
+        try (StreamTableWrite write = tableBranch.newWrite(commitUser);
+                StreamTableCommit commit = tableBranch.newCommit(commitUser)) {
+            write.write(rowData(2, 20, 200L));
+            commit.commit(1, write.prepareCommit(false, 2));
+        }
+
+        // Validate data in branch1
+        assertThat(
+                        getResult(
+                                tableBranch.newRead(),
+                                toSplits(tableBranch.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder(
+                        "0|0|0|binary|varbinary|mapKey:mapVal|multiset",
+                        "2|20|200|binary|varbinary|mapKey:mapVal|multiset");
+
+        // Validate data in main branch not changed
+        assertThat(
+                        getResult(
+                                table.newRead(),
+                                toSplits(table.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder("0|0|0|binary|varbinary|mapKey:mapVal|multiset");
+
+        // Merge branch1 to main branch
+        table.mergeBranch(BRANCH_NAME);
+
+        // After merge branch1, verify branch1 and the main branch have the same data
+        assertThat(
+                        getResult(
+                                table.newRead(),
+                                toSplits(table.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder(
+                        "0|0|0|binary|varbinary|mapKey:mapVal|multiset",
+                        "2|20|200|binary|varbinary|mapKey:mapVal|multiset");
+
+        // verify snapshot in branch1 and main branch is same
+        SnapshotManager snapshotManager = new SnapshotManager(new TraceableFileIO(), tablePath);
+        Snapshot branchSnapshot =
+                Snapshot.fromPath(
+                        new TraceableFileIO(),
+                        snapshotManager.copyWithBranch(BRANCH_NAME).snapshotPath(2));
+        Snapshot snapshot =
+                Snapshot.fromPath(new TraceableFileIO(), snapshotManager.snapshotPath(2));
+        assertThat(branchSnapshot.equals(snapshot)).isTrue();
+
+        // verify schema in branch1 and main branch is same
+        SchemaManager schemaManager = new SchemaManager(new TraceableFileIO(), tablePath);
+        TableSchema branchSchema =
+                SchemaManager.fromPath(
+                        new TraceableFileIO(),
+                        schemaManager.copyWithBranch(BRANCH_NAME).toSchemaPath(0));
+        TableSchema schema0 = schemaManager.schema(0);
+        assertThat(branchSchema.equals(schema0)).isTrue();
+
+        // Write two rows data to branch1 again
+        try (StreamTableWrite write = tableBranch.newWrite(commitUser);
+                StreamTableCommit commit = tableBranch.newCommit(commitUser)) {
+            write.write(rowData(3, 30, 300L));
+            write.write(rowData(4, 40, 400L));
+            commit.commit(2, write.prepareCommit(false, 3));
+        }
+
+        // Verify data in branch1
+        assertThat(
+                        getResult(
+                                tableBranch.newRead(),
+                                toSplits(tableBranch.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder(
+                        "0|0|0|binary|varbinary|mapKey:mapVal|multiset",
+                        "2|20|200|binary|varbinary|mapKey:mapVal|multiset",
+                        "3|30|300|binary|varbinary|mapKey:mapVal|multiset",
+                        "4|40|400|binary|varbinary|mapKey:mapVal|multiset");
+
+        // Verify data in main branch not changed
+        assertThat(
+                        getResult(
+                                table.newRead(),
+                                toSplits(table.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder(
+                        "0|0|0|binary|varbinary|mapKey:mapVal|multiset",
+                        "2|20|200|binary|varbinary|mapKey:mapVal|multiset");
+
+        // Merge branch1 to main branch again
+        table.mergeBranch("branch1");
+
+        // Verify data in main branch is same to branch1
+        assertThat(
+                        getResult(
+                                table.newRead(),
+                                toSplits(table.newSnapshotReader().read().dataSplits()),
+                                BATCH_ROW_TO_STRING))
+                .containsExactlyInAnyOrder(
+                        "0|0|0|binary|varbinary|mapKey:mapVal|multiset",
+                        "2|20|200|binary|varbinary|mapKey:mapVal|multiset",
+                        "3|30|300|binary|varbinary|mapKey:mapVal|multiset",
+                        "4|40|400|binary|varbinary|mapKey:mapVal|multiset");
+    }
+
+    @Test
     public void testUnsupportedTagName() throws Exception {
         FileStoreTable table = createFileStoreTable();
 
@@ -1578,7 +1766,6 @@ public abstract class FileStoreTableTestBase {
         table.createBranch(BRANCH_NAME, "tag1");
 
         // verify that branch1 file exist
-        TraceableFileIO fileIO = new TraceableFileIO();
         BranchManager branchManager = table.branchManager();
         assertThat(branchManager.branchExists(BRANCH_NAME)).isTrue();
 

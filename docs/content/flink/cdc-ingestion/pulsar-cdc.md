@@ -33,7 +33,7 @@ flink-connector-pulsar-*.jar
 ```
 
 ## Supported Formats
-Flink provides several Pulsar CDC formats: Canal, Debezium, Ogg and Maxwell JSON.
+Flink provides several Pulsar CDC formats: Canal, Debezium, Ogg, Maxwell and Normal JSON.
 If a message in a pulsar topic is a change event captured from another database using the Change Data Capture (CDC) tool, then you can use the Paimon Pulsar CDC. Write the INSERT, UPDATE, DELETE messages parsed into the paimon table.
 <table class="table table-bordered">
     <thead>
@@ -57,6 +57,10 @@ If a message in a pulsar topic is a change event captured from another database 
         </tr>
         <tr>
          <td><a href="https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/formats/ogg/">OGG CDC</a></td>
+        <td>True</td>
+        </tr>
+        <tr>
+         <td><a href="https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/formats/json/">JSON</a></td>
         <td>True</td>
         </tr>
     </tbody>
@@ -156,6 +160,27 @@ Then you can submit synchronization job:
     ... (other conf)
 ```
 
+Example 3:
+For some append data (such as log data), it can be treated as special CDC data with only INSERT operation type, so you can use 'format=json' to synchronize such data to the Paimon table.
+
+```bash
+<FLINK_HOME>/bin/flink run \
+    /path/to/paimon-flink-action-{{< version >}}.jar \
+    kafka_sync_table \
+    --warehouse hdfs:///path/to/warehouse \
+    --database test_db \
+    --table test_table \
+    --partition_keys pt \
+    --computed_column 'pt=date_format(event_tm, yyyyMMdd)' \
+    --kafka_conf properties.bootstrap.servers=127.0.0.1:9020 \
+    --kafka_conf topic=test_log \
+    --kafka_conf properties.group.id=123456 \
+    --kafka_conf value.format=json \
+    --catalog_conf metastore=hive \
+    --catalog_conf uri=thrift://hive-metastore:9083 \
+    --table_conf sink.parallelism=4
+```
+
 ## Synchronizing Databases
 
 By using [PulsarSyncDatabaseAction](/docs/{{< param Branch >}}/api/java/org/apache/paimon/flink/action/cdc/pulsar/PulsarSyncDatabaseAction) in a Flink DataStream job or directly through `flink run`, users can synchronize the multi topic or one topic into one Paimon database.
@@ -173,6 +198,8 @@ To use this feature through `flink run`, run the following shell command.
     [--including_tables <table-name|name-regular-expr>] \
     [--excluding_tables <table-name|name-regular-expr>] \
     [--type_mapping to-string] \
+    [--partition_keys <partition_keys>] \
+    [--primary_keys <primary-keys>] \
     [--pulsar_conf <pulsar-source-conf> [--pulsar_conf <pulsar-source-conf> ...]] \
     [--catalog_conf <paimon-catalog-conf> [--catalog_conf <paimon-catalog-conf> ...]] \
     [--table_conf <paimon-table-sink-conf> [--table_conf <paimon-table-sink-conf> ...]]

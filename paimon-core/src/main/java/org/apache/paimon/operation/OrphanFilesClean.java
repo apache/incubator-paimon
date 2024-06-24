@@ -52,6 +52,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -113,7 +114,7 @@ public class OrphanFilesClean {
     public OrphanFilesClean olderThan(String timestamp) {
         // The FileStatus#getModificationTime returns milliseconds
         this.olderThanMillis =
-                DateTimeUtils.parseTimestampData(timestamp, 3, DateTimeUtils.LOCAL_TZ)
+                DateTimeUtils.parseTimestampData(timestamp, 3, TimeZone.getDefault())
                         .getMillisecond();
         return this;
     }
@@ -212,25 +213,72 @@ public class OrphanFilesClean {
 
     private List<String> getUsedFilesForChangelog(Changelog changelog) {
         List<String> files = new ArrayList<>();
-        if (changelog.changelogManifestList() != null) {
-            files.add(changelog.changelogManifestList());
-        }
-
+        List<ManifestFileMeta> manifestFileMetas = new ArrayList<>();
         try {
             // try to read manifests
-            List<ManifestFileMeta> manifestFileMetas =
-                    retryReadingFiles(
-                            () ->
-                                    manifestList.readWithIOException(
-                                            changelog.changelogManifestList()));
-            if (manifestFileMetas == null) {
-                return Collections.emptyList();
+            // changelog manifest
+            List<ManifestFileMeta> changelogManifest = new ArrayList<>();
+            if (changelog.changelogManifestList() != null) {
+                files.add(changelog.changelogManifestList());
+                changelogManifest =
+                        retryReadingFiles(
+                                () ->
+                                        manifestList.readWithIOException(
+                                                changelog.changelogManifestList()));
+                if (changelogManifest != null) {
+                    manifestFileMetas.addAll(changelogManifest);
+                }
             }
-            List<String> manifestFileName =
+
+            // base manifest
+            if (manifestList.exists(changelog.baseManifestList())) {
+                files.add(changelog.baseManifestList());
+                List<ManifestFileMeta> baseManifest =
+                        retryReadingFiles(
+                                () ->
+                                        manifestList.readWithIOException(
+                                                changelog.baseManifestList()));
+                if (baseManifest != null) {
+                    manifestFileMetas.addAll(baseManifest);
+                }
+            }
+
+            // delta manifest
+            List<ManifestFileMeta> deltaManifest = null;
+            if (manifestList.exists(changelog.deltaManifestList())) {
+                files.add(changelog.deltaManifestList());
+                deltaManifest =
+                        retryReadingFiles(
+                                () ->
+                                        manifestList.readWithIOException(
+                                                changelog.deltaManifestList()));
+                if (deltaManifest != null) {
+                    manifestFileMetas.addAll(deltaManifest);
+                }
+            }
+
+            files.addAll(
                     manifestFileMetas.stream()
                             .map(ManifestFileMeta::fileName)
-                            .collect(Collectors.toList());
-            files.addAll(manifestFileName);
+                            .collect(Collectors.toList()));
+
+            // data file
+            List<String> manifestFileName = new ArrayList<>();
+            if (changelog.changelogManifestList() != null) {
+                manifestFileName.addAll(
+                        changelogManifest == null
+                                ? new ArrayList<>()
+                                : changelogManifest.stream()
+                                        .map(ManifestFileMeta::fileName)
+                                        .collect(Collectors.toList()));
+            } else {
+                manifestFileName.addAll(
+                        deltaManifest == null
+                                ? new ArrayList<>()
+                                : deltaManifest.stream()
+                                        .map(ManifestFileMeta::fileName)
+                                        .collect(Collectors.toList()));
+            }
 
             // try to read data files
             List<String> dataFiles = retryReadingDataFiles(manifestFileName);

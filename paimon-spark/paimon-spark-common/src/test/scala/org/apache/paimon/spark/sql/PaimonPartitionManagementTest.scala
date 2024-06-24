@@ -161,14 +161,39 @@ class PaimonPartitionManagementTest extends PaimonSparkTestBase {
 
             checkAnswer(
               spark.sql("select * from T"),
-              Row("a", "b", 1L, 20230816L, "1132") :: Row("a", "b", 1L, 20230816L, "1133") :: Row(
+              Row("a", "b         ", 1L, 20230816L, "1132") :: Row(
                 "a",
-                "b",
+                "b         ",
+                1L,
+                20230816L,
+                "1133") :: Row("a", "b         ", 2L, 20230817L, "1132") :: Row(
+                "a",
+                "b         ",
                 2L,
                 20230817L,
-                "1132") :: Row("a", "b", 2L, 20230817L, "1134") :: Nil
+                "1134") :: Nil
             )
           }
       }
+  }
+
+  test("Paimon Partition Management: drop null partition with specified default partition name") {
+    spark.sql(s"""
+                 |CREATE TABLE T (a INT, dt STRING)
+                 |PARTITIONED BY (dt)
+                 |TBLPROPERTIES ('partition.default-name'='__TEST_DEFAULT_PARTITION__')
+                 |""".stripMargin)
+
+    spark.sql("INSERT INTO T VALUES (1, '20240601'), (2, null)")
+    checkAnswer(
+      spark.sql("SHOW PARTITIONS T"),
+      Row("dt=20240601") :: Row("dt=null") :: Nil
+    )
+
+    spark.sql("ALTER TABLE T DROP PARTITION (dt=null)")
+    checkAnswer(
+      spark.sql("SHOW PARTITIONS T"),
+      Row("dt=20240601") :: Nil
+    )
   }
 }

@@ -73,7 +73,7 @@ public class LookupChangelogMergeFunctionWrapperTest {
                         highLevel::get,
                         EQUALISER,
                         changelogRowDeduplicate,
-                        LookupStrategy.CHANGELOG_ONLY,
+                        LookupStrategy.from(false, true, false),
                         null,
                         null);
 
@@ -233,7 +233,7 @@ public class LookupChangelogMergeFunctionWrapperTest {
                         key -> null,
                         EQUALISER,
                         changelogRowDeduplicate,
-                        LookupStrategy.CHANGELOG_ONLY,
+                        LookupStrategy.from(false, true, false),
                         null,
                         null);
 
@@ -322,7 +322,7 @@ public class LookupChangelogMergeFunctionWrapperTest {
                         highLevel::get,
                         EQUALISER,
                         false,
-                        LookupStrategy.CHANGELOG_ONLY,
+                        LookupStrategy.from(false, true, false),
                         null,
                         UserDefinedSeqComparator.create(
                                 RowType.builder().field("f0", DataTypes.INT()).build(),
@@ -392,7 +392,8 @@ public class LookupChangelogMergeFunctionWrapperTest {
                                         new RowType(
                                                 Lists.list(new DataField(0, "f0", new IntType()))),
                                         new RowType(
-                                                Lists.list(new DataField(1, "f1", new IntType())))),
+                                                Lists.list(new DataField(1, "f1", new IntType()))),
+                                        false),
                         highLevel::contains);
 
         // Without level-0

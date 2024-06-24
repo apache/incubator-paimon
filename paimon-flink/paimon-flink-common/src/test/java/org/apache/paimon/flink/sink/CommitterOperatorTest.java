@@ -22,7 +22,6 @@ import org.apache.paimon.CoreOptions;
 import org.apache.paimon.Snapshot;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.GenericRow;
-import org.apache.paimon.flink.VersionedSerializerWrapper;
 import org.apache.paimon.flink.utils.TestingMetricUtils;
 import org.apache.paimon.fs.local.LocalFileIO;
 import org.apache.paimon.io.CompactIncrement;
@@ -566,7 +565,7 @@ public class CommitterOperatorTest extends CommitterOperatorTestBase {
                         table, commit, Committer.createContext("", metricGroup, true, false, null));
         committer.commit(Collections.singletonList(manifestCommittable));
         CommitterMetrics metrics = committer.getCommitterMetrics();
-        assertThat(metrics.getNumBytesOutCounter().getCount()).isEqualTo(285);
+        assertThat(metrics.getNumBytesOutCounter().getCount()).isEqualTo(293);
         assertThat(metrics.getNumRecordsOutCounter().getCount()).isEqualTo(2);
         committer.close();
     }
@@ -580,9 +579,7 @@ public class CommitterOperatorTest extends CommitterOperatorTestBase {
                         table,
                         null,
                         new RestoreAndFailCommittableStateManager<>(
-                                () ->
-                                        new VersionedSerializerWrapper<>(
-                                                new ManifestCommittableSerializer())));
+                                ManifestCommittableSerializer::new));
         OneInputStreamOperatorTestHarness<Committable, Committable> testHarness =
                 createTestHarness(operator);
         testHarness.open();
@@ -678,9 +675,7 @@ public class CommitterOperatorTest extends CommitterOperatorTestBase {
                         table,
                         null,
                         new RestoreAndFailCommittableStateManager<>(
-                                () ->
-                                        new VersionedSerializerWrapper<>(
-                                                new ManifestCommittableSerializer())));
+                                ManifestCommittableSerializer::new));
         return createTestHarness(operator);
     }
 

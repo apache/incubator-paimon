@@ -21,7 +21,6 @@ package org.apache.paimon.flink.sink;
 import org.apache.paimon.CoreOptions;
 import org.apache.paimon.append.MultiTableAppendOnlyCompactionTask;
 import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.flink.VersionedSerializerWrapper;
 import org.apache.paimon.manifest.WrappedManifestCommittable;
 import org.apache.paimon.options.Options;
 
@@ -39,8 +38,9 @@ import org.apache.flink.table.data.RowData;
 
 import java.io.Serializable;
 import java.util.Map;
-import java.util.UUID;
 
+import static org.apache.paimon.CoreOptions.createCommitUser;
+import static org.apache.paimon.flink.FlinkConnectorOptions.END_INPUT_WATERMARK;
 import static org.apache.paimon.flink.FlinkConnectorOptions.SINK_COMMITTER_OPERATOR_CHAINING;
 import static org.apache.paimon.flink.FlinkConnectorOptions.SINK_MANAGED_WRITER_BUFFER_MEMORY;
 import static org.apache.paimon.flink.FlinkConnectorOptions.SINK_USE_MANAGED_MEMORY;
@@ -57,7 +57,6 @@ public class CombinedTableCompactorSink implements Serializable {
 
     private final Catalog.Loader catalogLoader;
     private final boolean ignorePreviousFiles;
-
     private final Options options;
 
     public CombinedTableCompactorSink(Catalog.Loader catalogLoader, Options options) {
@@ -74,8 +73,8 @@ public class CombinedTableCompactorSink implements Serializable {
         // commit operators.
         // When the job restarts, commitUser will be recovered from states and this value is
         // ignored.
-        String initialCommitUser = UUID.randomUUID().toString();
-        return sinkFrom(awareBucketTableSource, unawareBucketTableSource, initialCommitUser);
+        return sinkFrom(
+                awareBucketTableSource, unawareBucketTableSource, createCommitUser(options));
     }
 
     public DataStreamSink<?> sinkFrom(
@@ -153,7 +152,8 @@ public class CombinedTableCompactorSink implements Serializable {
                                         options.get(SINK_COMMITTER_OPERATOR_CHAINING),
                                         commitUser,
                                         createCommitterFactory(),
-                                        createCommittableStateManager()))
+                                        createCommittableStateManager(),
+                                        options.get(END_INPUT_WATERMARK)))
                         .setParallelism(1)
                         .setMaxParallelism(1);
         return committed.addSink(new DiscardingSink<>()).name("end").setParallelism(1);
@@ -181,6 +181,6 @@ public class CombinedTableCompactorSink implements Serializable {
 
     protected CommittableStateManager<WrappedManifestCommittable> createCommittableStateManager() {
         return new RestoreAndFailCommittableStateManager<>(
-                () -> new VersionedSerializerWrapper<>(new WrappedManifestCommittableSerializer()));
+                WrappedManifestCommittableSerializer::new);
     }
 }

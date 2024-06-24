@@ -36,6 +36,7 @@ import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.io.KeyValueFileReaderFactory;
 import org.apache.paimon.io.KeyValueFileWriterFactory;
 import org.apache.paimon.io.RollingFileWriter;
+import org.apache.paimon.manifest.FileSource;
 import org.apache.paimon.memory.HeapMemorySegmentPool;
 import org.apache.paimon.mergetree.compact.AbstractCompactRewriter;
 import org.apache.paimon.mergetree.compact.CompactRewriter;
@@ -457,6 +458,7 @@ public abstract class MergeTreeTestBase {
                 options.numSortedRunStopTrigger(),
                 new TestRewriter(),
                 null,
+                null,
                 false);
     }
 
@@ -477,6 +479,7 @@ public abstract class MergeTreeTestBase {
                     minFileSize,
                     numSortedRunStopTrigger,
                     rewriter,
+                    null,
                     null,
                     false);
         }
@@ -608,7 +611,7 @@ public abstract class MergeTreeTestBase {
                 int outputLevel, boolean dropDelete, List<List<SortedRun>> sections)
                 throws Exception {
             RollingFileWriter<KeyValue, DataFileMeta> writer =
-                    writerFactory.createRollingMergeTreeFileWriter(outputLevel);
+                    writerFactory.createRollingMergeTreeFileWriter(outputLevel, FileSource.COMPACT);
             RecordReader<KeyValue> reader =
                     MergeTreeReaders.readerForMergeTree(
                             sections,

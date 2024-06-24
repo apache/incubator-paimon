@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.paimon.testutils.assertj.PaimonAssertions.anyCauseMatches;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -95,11 +96,20 @@ public class BatchFileStoreITCase extends CatalogITCaseBase {
                                 "SELECT * FROM T /*+ OPTIONS('scan.mode'='from-snapshot-full','scan.snapshot-id'='1') */"))
                 .containsExactlyInAnyOrder(Row.of(1, 11, 111), Row.of(2, 22, 222));
 
-        assertThat(batchSql("SELECT * FROM T /*+ OPTIONS('scan.snapshot-id'='0') */")).isEmpty();
-        assertThat(
-                        batchSql(
-                                "SELECT * FROM T /*+ OPTIONS('scan.mode'='from-snapshot-full','scan.snapshot-id'='0') */"))
-                .isEmpty();
+        assertThatThrownBy(() -> batchSql("SELECT * FROM T /*+ OPTIONS('scan.snapshot-id'='0') */"))
+                .satisfies(
+                        anyCauseMatches(
+                                IllegalArgumentException.class,
+                                "The specified scan snapshotId 0 is out of available snapshotId range [1, 4]."));
+
+        assertThatThrownBy(
+                        () ->
+                                batchSql(
+                                        "SELECT * FROM T /*+ OPTIONS('scan.mode'='from-snapshot-full','scan.snapshot-id'='0') */"))
+                .satisfies(
+                        anyCauseMatches(
+                                IllegalArgumentException.class,
+                                "The specified scan snapshotId 0 is out of available snapshotId range [1, 4]."));
 
         assertThat(
                         batchSql(
@@ -200,7 +210,7 @@ public class BatchFileStoreITCase extends CatalogITCaseBase {
                                                 time3)))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .hasRootCauseMessage(
-                        "[scan.snapshot-id] must be null when you set [scan.timestamp-millis]");
+                        "[scan.snapshot-id] must be null when you set [scan.timestamp-millis,scan.timestamp]");
 
         assertThatThrownBy(
                         () ->
@@ -420,6 +430,38 @@ public class BatchFileStoreITCase extends CatalogITCaseBase {
 
         sql("INSERT INTO ignore_delete VALUES (1, 'B')");
         assertThat(sql("SELECT * FROM ignore_delete")).containsExactly(Row.of(1, "B"));
+    }
+
+    @Test
+    public void testIgnoreDeleteCompatible() {
+        sql(
+                "CREATE TABLE ignore_delete (pk INT PRIMARY KEY NOT ENFORCED, v STRING) "
+                        + "WITH ('merge-engine' = 'deduplicate', 'write-only' = 'true')");
+
+        sql("INSERT INTO ignore_delete VALUES (1, 'A')");
+        // write delete records
+        sql("DELETE FROM ignore_delete WHERE pk = 1");
+        assertThat(sql("SELECT * FROM ignore_delete")).isEmpty();
+
+        // set ignore-delete and read
+        sql("ALTER TABLE ignore_delete set ('ignore-delete' = 'true')");
+        assertThat(sql("SELECT * FROM ignore_delete")).containsExactlyInAnyOrder(Row.of(1, "A"));
+    }
+
+    @Test
+    public void testIgnoreDeleteWithRowKindField() {
+        sql(
+                "CREATE TABLE ignore_delete (pk INT PRIMARY KEY NOT ENFORCED, v STRING, kind STRING) "
+                        + "WITH ('merge-engine' = 'deduplicate', 'ignore-delete' = 'true', 'bucket' = '1', 'rowkind.field' = 'kind')");
+
+        sql("INSERT INTO ignore_delete VALUES (1, 'A', '+I')");
+        assertThat(sql("SELECT * FROM ignore_delete")).containsExactly(Row.of(1, "A", "+I"));
+
+        sql("INSERT INTO ignore_delete VALUES (1, 'A', '-D')");
+        assertThat(sql("SELECT * FROM ignore_delete")).containsExactly(Row.of(1, "A", "+I"));
+
+        sql("INSERT INTO ignore_delete VALUES (1, 'B', '+I')");
+        assertThat(sql("SELECT * FROM ignore_delete")).containsExactly(Row.of(1, "B", "+I"));
     }
 
     @Test

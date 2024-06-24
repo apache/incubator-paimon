@@ -33,7 +33,7 @@ flink-sql-connector-kafka-*.jar
 ```
 
 ## Supported Formats
-Flink provides several Kafka CDC formats: Canal, Debezium, Ogg and Maxwell JSON.
+Flink provides several Kafka CDC formats: Canal, Debezium, Ogg, Maxwell and Normal JSON.
 If a message in a Kafka topic is a change event captured from another database using the Change Data Capture (CDC) tool, then you can use the Paimon Kafka CDC. Write the INSERT, UPDATE, DELETE messages parsed into the paimon table.
 <table class="table table-bordered">
     <thead>
@@ -57,6 +57,10 @@ If a message in a Kafka topic is a change event captured from another database u
         </tr>
         <tr>
          <td><a href="https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/formats/ogg/">OGG CDC</a></td>
+        <td>True</td>
+        </tr>
+        <tr>
+         <td><a href="https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/formats/json/">JSON</a></td>
         <td>True</td>
         </tr>
     </tbody>
@@ -157,6 +161,27 @@ Then you can submit synchronization job:
     ... (other conf)
 ```
 
+Example 3: 
+For some append data (such as log data), it can be treated as special CDC data with only INSERT operation type, so you can use 'format=json' to synchronize such data to the Paimon table.
+
+```bash
+<FLINK_HOME>/bin/flink run \
+    /path/to/paimon-flink-action-{{< version >}}.jar \
+    kafka_sync_table \
+    --warehouse hdfs:///path/to/warehouse \
+    --database test_db \
+    --table test_table \
+    --partition_keys pt \
+    --computed_column 'pt=date_format(event_tm, yyyyMMdd)' \
+    --kafka_conf properties.bootstrap.servers=127.0.0.1:9020 \
+    --kafka_conf topic=test_log \
+    --kafka_conf properties.group.id=123456 \
+    --kafka_conf value.format=json \
+    --catalog_conf metastore=hive \
+    --catalog_conf uri=thrift://hive-metastore:9083 \
+    --table_conf sink.parallelism=4
+```
+
 ## Synchronizing Databases
 
 By using [KafkaSyncDatabaseAction](/docs/{{< param Branch >}}/api/java/org/apache/paimon/flink/action/cdc/kafka/KafkaSyncDatabaseAction) in a Flink DataStream job or directly through `flink run`, users can synchronize the multi topic or one topic into one Paimon database.
@@ -174,14 +199,14 @@ To use this feature through `flink run`, run the following shell command.
     [--including_tables <table-name|name-regular-expr>] \
     [--excluding_tables <table-name|name-regular-expr>] \
     [--type_mapping to-string] \
+    [--partition_keys <partition_keys>] \
+    [--primary_keys <primary-keys>] \
     [--kafka_conf <kafka-source-conf> [--kafka_conf <kafka-source-conf> ...]] \
     [--catalog_conf <paimon-catalog-conf> [--catalog_conf <paimon-catalog-conf> ...]] \
     [--table_conf <paimon-table-sink-conf> [--table_conf <paimon-table-sink-conf> ...]]
 ```
 
 {{< generated/kafka_sync_database >}}
-
-Only tables with primary keys will be synchronized.
 
 This action will build a single combined sink for all tables. For each Kafka topic's table to be synchronized, if the
 corresponding Paimon table does not exist, this action will automatically create the table, and its schema will be derived

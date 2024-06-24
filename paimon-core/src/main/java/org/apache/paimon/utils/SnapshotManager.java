@@ -44,10 +44,10 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import static org.apache.paimon.utils.BranchManager.DEFAULT_MAIN_BRANCH;
 import static org.apache.paimon.utils.BranchManager.getBranchPath;
-import static org.apache.paimon.utils.BranchManager.isMainBranch;
 import static org.apache.paimon.utils.FileUtils.listVersionedFiles;
 
 /** Manager for {@link Snapshot}, providing utility methods related to paths and snapshot hints. */
@@ -90,35 +90,27 @@ public class SnapshotManager implements Serializable {
     }
 
     public Path changelogDirectory() {
-        return isMainBranch(branch)
-                ? new Path(tablePath + "/changelog")
-                : new Path(getBranchPath(tablePath, branch) + "/changelog");
+        return new Path(getBranchPath(fileIO, tablePath, branch) + "/changelog");
     }
 
     public Path longLivedChangelogPath(long snapshotId) {
-        return isMainBranch(branch)
-                ? new Path(tablePath + "/changelog/" + CHANGELOG_PREFIX + snapshotId)
-                : new Path(
-                        getBranchPath(tablePath, branch)
-                                + "/changelog/"
-                                + CHANGELOG_PREFIX
-                                + snapshotId);
+        return new Path(
+                getBranchPath(fileIO, tablePath, branch)
+                        + "/changelog/"
+                        + CHANGELOG_PREFIX
+                        + snapshotId);
     }
 
     public Path snapshotPath(long snapshotId) {
-        return isMainBranch(branch)
-                ? new Path(tablePath + "/snapshot/" + SNAPSHOT_PREFIX + snapshotId)
-                : new Path(
-                        getBranchPath(tablePath, branch)
-                                + "/snapshot/"
-                                + SNAPSHOT_PREFIX
-                                + snapshotId);
+        return new Path(
+                getBranchPath(fileIO, tablePath, branch)
+                        + "/snapshot/"
+                        + SNAPSHOT_PREFIX
+                        + snapshotId);
     }
 
     public Path snapshotDirectory() {
-        return isMainBranch(branch)
-                ? new Path(tablePath + "/snapshot")
-                : new Path(getBranchPath(tablePath, branch) + "/snapshot");
+        return new Path(getBranchPath(fileIO, tablePath, branch) + "/snapshot");
     }
 
     public Snapshot snapshot(long snapshotId) {
@@ -360,6 +352,32 @@ public class SnapshotManager implements Serializable {
     public Iterator<Snapshot> snapshots() throws IOException {
         return listVersionedFiles(fileIO, snapshotDirectory(), SNAPSHOT_PREFIX)
                 .map(id -> snapshot(id))
+                .sorted(Comparator.comparingLong(Snapshot::id))
+                .iterator();
+    }
+
+    public Iterator<Snapshot> snapshotsWithinRange(
+            Optional<Long> optionalMaxSnapshotId, Optional<Long> optionalMinSnapshotId)
+            throws IOException {
+        Long lowerBoundSnapshotId = earliestSnapshotId();
+        Long upperBoundSnapshotId = latestSnapshotId();
+
+        // null check on lowerBoundSnapshotId & upperBoundSnapshotId
+        if (lowerBoundSnapshotId == null || upperBoundSnapshotId == null) {
+            return Collections.emptyIterator();
+        }
+
+        if (optionalMaxSnapshotId.isPresent()) {
+            upperBoundSnapshotId = optionalMaxSnapshotId.get();
+        }
+
+        if (optionalMinSnapshotId.isPresent()) {
+            lowerBoundSnapshotId = optionalMinSnapshotId.get();
+        }
+
+        // +1 here to include the upperBoundSnapshotId
+        return LongStream.range(lowerBoundSnapshotId, upperBoundSnapshotId + 1)
+                .mapToObj(this::snapshot)
                 .sorted(Comparator.comparingLong(Snapshot::id))
                 .iterator();
     }
@@ -614,6 +632,12 @@ public class SnapshotManager implements Serializable {
     private Long findByListFiles(BinaryOperator<Long> reducer, Path dir, String prefix)
             throws IOException {
         return listVersionedFiles(fileIO, dir, prefix).reduce(reducer).orElse(null);
+    }
+
+    public void deleteLatestHint() throws IOException {
+        Path snapshotDir = snapshotDirectory();
+        Path hintFile = new Path(snapshotDir, LATEST);
+        fileIO.delete(hintFile, false);
     }
 
     public void commitLatestHint(long snapshotId) throws IOException {
