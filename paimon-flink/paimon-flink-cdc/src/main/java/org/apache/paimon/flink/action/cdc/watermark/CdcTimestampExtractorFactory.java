@@ -124,6 +124,7 @@ public class CdcTimestampExtractorFactory implements Serializable {
         }
     }
 
+    /** Timestamp extractor for Cdc debezium deserialization. */
     public abstract static class CdcDebeziumTimestampExtractor implements CdcTimestampExtractor {
 
         protected final ObjectMapper objectMapper = new ObjectMapper();
